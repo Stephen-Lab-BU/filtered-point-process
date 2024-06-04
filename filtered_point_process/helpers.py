@@ -1,5 +1,5 @@
 class TimeDomain:
-    def __init__(self, time_axis, intensity_realization = None, events = None):
+    def __init__(self, time_axis, intensity_realization=None, events=None):
         self.time_axis = time_axis
         self.intensity_realization = intensity_realization
         self.events = events
@@ -32,4 +32,3 @@ def create_time_domain(time_axis, intensity_realization=None, events=None):
 
 def create_frequency_domain(frequencies, PSD):
     return FrequencyDomain(frequencies, PSD)
-

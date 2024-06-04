@@ -2,12 +2,13 @@ from .cif import ConditionalIntensityFunction
 from .pp import PointProcess
 from .ParamSetter import ParamSetter, GlobalSeed
 
+
 class PointProcessModel(ParamSetter, GlobalSeed):
     def __init__(self, params=None, config_file=None, seed=None):
         super().set_params(config_file, params)
         super()._set_seed(seed)
-        self.cif = ConditionalIntensityFunction(params=self.params, seed = seed)
-        self.pp = PointProcess(CIF = self.cif, params=self.params, seed = seed)
+        self.cif = ConditionalIntensityFunction(params=self.params, seed=seed)
+        self.pp = PointProcess(CIF=self.cif, params=self.params, seed=seed)
 
     def simulate_cif(self):
         self.cif._simulate()
