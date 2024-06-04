@@ -1,0 +1,30 @@
+{
+    "method": {
+        "value": "AR(1)",
+        "description": "The method used for the CIF. Currently there are three supported: Gaussian, AR(1), and Homogeneous Poisson."
+    },
+    "phi_1": {
+        "value": 0.5,
+        "description": "This parameter represents the autoregressive coefficient for the AR(1) process. It captures the amount of 'influence' of the p time point on the current time relative to the noise terms. As phi gets closer to 0, the process will emulate white noise. This terms also needs to be less than 1 to be wide-sense stationary."
+    },
+    "white_noise_variance": {
+        "value": 0.2,
+        "description": "AR(p) processes, (e.g., AR(1), have an additive white noise process with mean zero and constant variance. Defined here is the constant variance."
+    },
+    "fs": {
+        "value": 10000,
+        "description": "The sampling rate for the simulation."
+    },
+    "T": {
+        "value": 3,
+        "description": "The total time duration for the simulation in seconds."
+    },
+    "Nsims": {
+        "value": 1,
+        "description": "The number of simulations to run, currently in the beta version only 1 is supported."
+    },
+    "lambda_0": {
+        "value": [75],
+        "description": "Baseline or mean rate rate for the point process. Note a distinction here: CIFs introduce temporal dynamics into point process firing rates, but lambda_0 introduces a linear y-axis shift on the power spectrum."
+    }
+}
