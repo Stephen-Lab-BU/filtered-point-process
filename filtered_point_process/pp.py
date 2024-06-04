@@ -52,45 +52,6 @@ class PointProcess(ConditionalIntensityFunction, ParamSetter, GlobalSeed):
         else:
             raise ValueError(f"Unknown method: {self.pp_params['method']}")
 
-    def _generate_cox_spikes_old(self):
-
-        intensity = self.cif.time_domain.get_intensity_realization().squeeze()
-        time_axis = self.cif.time_domain.get_time_axis()
-
-        # Simulate spikes from CIF
-        spikes = np.less(np.random.uniform(0, 1, intensity.shape), intensity)
-
-        # Get the spike times
-        spike_times = time_axis[spikes]
-
-        # simulate spikes from cif
-        # spikes = np.less(np.random.uniform(0,1,self.cif.time_domain.get_intensity_realization().squeeze().shape),self.cif.time_domain.get_intensity_realization().squeeze())
-
-        return spike_times
-
-    def _generate_cox_spikes_working(self):
-        """
-        Simulate spikes in continuous time from the conditional intensity function (CIF).
-
-        Returns:
-        np.ndarray: Array of spike times.
-        """
-        intensity = self.cif.time_domain.get_intensity_realization().squeeze()
-        time_axis = self.cif.time_domain.get_time_axis()
-        N = len(time_axis)
-        Nsims = self.params["Nsims"]
-
-        # Generate a random uniform array for each simulation
-        random_uniform_array = np.random.uniform(0, 1, N)
-
-        # Simulate spikes from CIF
-        spikes = random_uniform_array < intensity
-
-        # Get the spike times for each simulation
-        spikes = np.array(time_axis[spikes])
-
-        return spikes
-
     def _generate_cox_spikes(self):
         """
         Simulate spikes in continuous time from the conditional intensity function (CIF)

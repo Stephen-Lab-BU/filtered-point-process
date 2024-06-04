@@ -271,7 +271,7 @@ class ConditionalIntensityFunction(ParamSetter, GlobalSeed):
         var_Xt = self.params["white_noise_variance"] ** 2 / (
             1 - self.params["phi_1"] ** 2
         )
-        mean_desired = 3 * np.sqrt(var_Xt)  # 3 standard deviations above zero
+        mean_desired = 6 * np.sqrt(var_Xt)  # 6 standard deviations above zero
         c = (1 - self.params["phi_1"]) * mean_desired
 
         n_sims = self.params["Nsims"]
