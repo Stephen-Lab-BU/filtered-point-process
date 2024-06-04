@@ -1,0 +1,22 @@
+{
+    "method": {
+        "value": "Homogeneous_Poisson",
+        "description": "The method used for the CIF. Currently there are three supported: Gaussian, AR(1), and Homogeneous Poisson. Homogeneous Poisson processes just have a mean rate specified and operate like the point process version of white noise."
+    },
+    "tau_rise": {
+        "value": 1000,
+        "description": "The sampling rate for the simulation."
+    },
+    "tau_decay": {
+        "value": 3,
+        "description": "The total time duration for the simulation in seconds."
+    },
+    "Nsims": {
+        "value": 1,
+        "description": "The number of simulations to run, currently in the beta version only 1 is supported."
+    },
+    "lambda_0": {
+        "value": [75],
+        "description": "Baseline or mean rate rate for the point process. Note a distinction here: CIFs introduce temporal dynamics into point process firing rates, but lambda_0 introduces a linear y-axis shift on the power spectrum."
+    }
+}
