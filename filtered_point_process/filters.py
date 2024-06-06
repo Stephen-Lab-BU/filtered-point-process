@@ -22,12 +22,16 @@ class Filter(ParamSetter, GlobalSeed):
         if model is not None:
             self.pp = model
         else:
-            raise ValueError("Model was left as None, please specify a model you want to pass to the filters.")
+            raise ValueError(
+                "Model was left as None, please specify a model you want to pass to the filters."
+            )
 
         # Initialize filters
         self.filter_instances = {}
         for filter_name, filter_type in filters.items():
-            self.filter_instances[filter_name] = self.initialize_filter(filter_type, self.pp)
+            self.filter_instances[filter_name] = self.initialize_filter(
+                filter_type, self.pp
+            )
 
     def _validate_filters(self, filters):
         """Validate filter types."""
@@ -54,33 +58,43 @@ class Filter(ParamSetter, GlobalSeed):
 class FilterBase:
     """Base filter class for the post synaptic."""
 
-    def __init__(self, point_process, tau_rise=None, tau_decay=None, filter_params=None):
+    def __init__(
+        self, point_process, tau_rise=None, tau_decay=None, filter_params=None
+    ):
         """Initialize filter with given point process and time constants."""
         self.pp = point_process
         self.filter_params = filter_params if filter_params is not None else {}
-        self.filter_params["tau_rise"] = tau_rise if tau_rise is not None else self.filter_params.get("tau_rise")
-        self.filter_params["tau_decay"] = tau_decay if tau_decay is not None else self.filter_params.get("tau_decay")
+        self.filter_params["tau_rise"] = (
+            tau_rise if tau_rise is not None else self.filter_params.get("tau_rise")
+        )
+        self.filter_params["tau_decay"] = (
+            tau_decay if tau_decay is not None else self.filter_params.get("tau_decay")
+        )
 
     def compute_psc(self):
         """Compute the post-synaptic current in both time and frequency domain."""
-        self.filter_params["filter_time_vector"] = np.arange(0, 0.040, 1 / self.pp.params["fs"])
-        self._psc_t = np.exp(-self.filter_params["filter_time_vector"] / self.filter_params["tau_decay"]) - np.exp(
+        self.filter_params["filter_time_vector"] = np.arange(
+            0, 0.040, 1 / self.pp.params["fs"]
+        )
+        self._psc_t = np.exp(
+            -self.filter_params["filter_time_vector"] / self.filter_params["tau_decay"]
+        ) - np.exp(
             -self.filter_params["filter_time_vector"] / self.filter_params["tau_rise"]
         )
 
         # Normalize psc_t by its maximum value
         self._psc_t /= np.max(self._psc_t)
 
-        self._psc_f = 1 / (1 / self.filter_params["tau_decay"] + 1j * 2 * np.pi * self.frequencies) - 1 / (
-            1 / self.filter_params["tau_rise"] + 1j * 2 * np.pi * self.frequencies
-        )
+        self._psc_f = 1 / (
+            1 / self.filter_params["tau_decay"] + 1j * 2 * np.pi * self.frequencies
+        ) - 1 / (1 / self.filter_params["tau_rise"] + 1j * 2 * np.pi * self.frequencies)
 
         # Normalize psc_f by its maximum value
         self._psc_f /= np.max(np.abs(self._psc_f))
 
         self._psc_fsym = self._psc_f.copy()
-        self._psc_fsym[int(np.floor(self.pp.params["NFFT"] / 2 + 1)):] = np.flipud(
-            np.conj(self._psc_fsym[1:int(np.floor(self.pp.params["NFFT"] / 2))])
+        self._psc_fsym[int(np.floor(self.pp.params["NFFT"] / 2 + 1)) :] = np.flipud(
+            np.conj(self._psc_fsym[1 : int(np.floor(self.pp.params["NFFT"] / 2))])
         )
 
         # Output theoretical spectrum of filter
@@ -112,7 +126,12 @@ class AMPAFilter(FilterBase):
 
     def __init__(self, point_process, filter_params=None):
         """Initialize filter with given point process and default time constants for AMPA."""
-        super().__init__(point_process, filter_params=filter_params, tau_rise=0.4 / 1000, tau_decay=2 / 1000)
+        super().__init__(
+            point_process,
+            filter_params=filter_params,
+            tau_rise=0.4 / 1000,
+            tau_decay=2 / 1000,
+        )
         self.compute_psc()
 
 
@@ -121,7 +140,12 @@ class GABAFilter(FilterBase):
 
     def __init__(self, point_process, filter_params=None):
         """Initialize filter with given point process and default time constants for GABA."""
-        super().__init__(point_process, filter_params=filter_params, tau_rise=0.4 / 1000, tau_decay=10 / 1000)
+        super().__init__(
+            point_process,
+            filter_params=filter_params,
+            tau_rise=0.4 / 1000,
+            tau_decay=10 / 1000,
+        )
         self.compute_psc()
 
 
@@ -139,11 +163,13 @@ class LeakyIntegratorFilter(FilterBase):
 
     def compute_li(self):
         """Compute the leaky integrator response in both time and frequency domain."""
-        self._li_t = np.exp(-self.filter_params["filter_time_vector"] * self.filter_params["A"])
+        self._li_t = np.exp(
+            -self.filter_params["filter_time_vector"] * self.filter_params["A"]
+        )
         self._li_f = 1 / (self.filter_params["A"] + 1j * 2 * np.pi * self.frequencies)
         self._li_fsym = self._li_f.copy()
-        self._li_fsym[int(np.floor(self.pp.params["NFFT"] / 2 + 1)):] = np.flipud(
-            np.conj(self._li_fsym[1:int(np.floor(self.pp.params["NFFT"] / 2))])
+        self._li_fsym[int(np.floor(self.pp.params["NFFT"] / 2 + 1)) :] = np.flipud(
+            np.conj(self._li_fsym[1 : int(np.floor(self.pp.params["NFFT"] / 2))])
         )
 
         self._li_fsym /= np.max(np.abs(self._li_fsym))
@@ -180,14 +206,20 @@ class FastAPFilter(FilterBase):
         f = self.pp.params["frequencies"]
 
         self.filter_params["filter_time_vector"] = self.filter_params.get(
-            "filter_time_vector", t)
+            "filter_time_vector", t
+        )
 
         self._kernel_t = (
-            self.k * np.exp(-((t - self.t0) ** 2) / (2 * self.sigma**2)) * np.cos(2 * np.pi * self.f0 * (t - self.t0) + self.theta)
+            self.k
+            * np.exp(-((t - self.t0) ** 2) / (2 * self.sigma**2))
+            * np.cos(2 * np.pi * self.f0 * (t - self.t0) + self.theta)
         )
-        self._kernel_f = (
-            self.k * np.exp(-2 * np.pi**2 * self.sigma**2 * (f - self.f0) ** 2) * np.exp(1j * (self.theta - 2 * np.pi * f * self.t0))
-            + self.k * np.exp(-2 * np.pi**2 * self.sigma**2 * (f + self.f0) ** 2) * np.exp(-1j * (self.theta + 2 * np.pi * f * self.t0))
+        self._kernel_f = self.k * np.exp(
+            -2 * np.pi**2 * self.sigma**2 * (f - self.f0) ** 2
+        ) * np.exp(1j * (self.theta - 2 * np.pi * f * self.t0)) + self.k * np.exp(
+            -2 * np.pi**2 * self.sigma**2 * (f + self.f0) ** 2
+        ) * np.exp(
+            -1j * (self.theta + 2 * np.pi * f * self.t0)
         )
         self._kernel_spectrum = np.abs(self._kernel_f) ** 2
 
@@ -221,13 +253,19 @@ class SlowAPFilter(FilterBase):
         f = self.pp.params["frequencies"]
 
         self._kernel_t = (
-            self.k * np.exp(-((t - self.t0) ** 2) / (2 * self.sigma**2)) * np.cos(2 * np.pi * self.f0 * (t - self.t0) + self.theta)
+            self.k
+            * np.exp(-((t - self.t0) ** 2) / (2 * self.sigma**2))
+            * np.cos(2 * np.pi * self.f0 * (t - self.t0) + self.theta)
         )
         self.filter_params["filter_time_vector"] = self.filter_params.get(
-            "filter_time_vector", t)
-        self._kernel_f = (
-            self.k * np.exp(-2 * np.pi**2 * self.sigma**2 * (f - self.f0) ** 2) * np.exp(1j * (self.theta - 2 * np.pi * f * self.t0))
-            + self.k * np.exp(-2 * np.pi**2 * self.sigma**2 * (f + self.f0) ** 2) * np.exp(-1j * (self.theta + 2 * np.pi * f * self.t0))
+            "filter_time_vector", t
+        )
+        self._kernel_f = self.k * np.exp(
+            -2 * np.pi**2 * self.sigma**2 * (f - self.f0) ** 2
+        ) * np.exp(1j * (self.theta - 2 * np.pi * f * self.t0)) + self.k * np.exp(
+            -2 * np.pi**2 * self.sigma**2 * (f + self.f0) ** 2
+        ) * np.exp(
+            -1j * (self.theta + 2 * np.pi * f * self.t0)
         )
         self._kernel_spectrum = np.abs(self._kernel_f) ** 2
 

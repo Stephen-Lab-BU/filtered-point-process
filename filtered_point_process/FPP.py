@@ -1,17 +1,20 @@
 from .filters import Filter
 import numpy as np
 
+
 class FilteredPointProcess(Filter):
     """Class to interact with the filtered point process."""
 
     def __init__(self, filters=None, model=None):
         super().__init__(filters=filters, model=model)
-        self.filter_names = list(filters.keys())  
-        self.filter_labels = list(filters.values())  
+        self.filter_names = list(filters.keys())
+        self.filter_labels = list(filters.values())
 
     def get_filters(self):
         outputs = {}
-        for filter_name, filter_instance in zip(self.filter_names, self.filter_instances.values()):
+        for filter_name, filter_instance in zip(
+            self.filter_names, self.filter_instances.values()
+        ):
             outputs[filter_name] = {
                 "time_axis": filter_instance.kernel_time_axis,
                 "kernel": filter_instance.kernel,
@@ -29,9 +32,13 @@ class FilteredPointProcess(Filter):
 
         spike_train = self._create_spike_train(spike_times, time_axis, fs)
 
-        for i, (filter_name, filter_instance) in enumerate(zip(self.filter_labels, self.filter_instances.values())):
+        for i, (filter_name, filter_instance) in enumerate(
+            zip(self.filter_labels, self.filter_instances.values())
+        ):
             if i == 0:
-                sim_PSPs = self._convolve_spikes_with_kernels(spike_train, filter_instance.kernel, fs)
+                sim_PSPs = self._convolve_spikes_with_kernels(
+                    spike_train, filter_instance.kernel, fs
+                )
                 results[f"pp ⨂ {filter_name}"] = sim_PSPs
             else:
                 previous_filter_label = " ⨂ ".join(self.filter_labels[:i])
@@ -45,13 +52,17 @@ class FilteredPointProcess(Filter):
     def get_spectra(self):
         """Calculate the theoretical power spectrum of the filter."""
         spectra = {}
-        
+
         for i, filter_name in enumerate(self.filter_names):
             filter_instance = self.filter_instances[filter_name]
             if i == 0:
-                spectra[f"pp * {self.filter_labels[i]}"] = self._calculate_spectrum(filter_instance)
+                spectra[f"pp * {self.filter_labels[i]}"] = self._calculate_spectrum(
+                    filter_instance
+                )
             else:
-                spectra[f"pp * {self.filter_labels[i]}"] = self._calculate_spectrum(filter_instance)
+                spectra[f"pp * {self.filter_labels[i]}"] = self._calculate_spectrum(
+                    filter_instance
+                )
                 combined_spectrum_name = f"pp * {' * '.join(self.filter_labels[:i+1])}"
                 combined_spectrum = self._calculate_combined_spectrum(
                     filter_instance, self.filter_instances[self.filter_names[i - 1]]
@@ -76,7 +87,9 @@ class FilteredPointProcess(Filter):
         """Helper function to calculate power spectrum for a given filter instance."""
         S = filter_instance.pp.pp_PSD
         pp_power_spectrum = np.squeeze(np.array(S))
-        primary_spectrum = filter_instance.kernel_spectrum * (pp_power_spectrum / filter_instance.pp.params["fs"] ** 2)
+        primary_spectrum = filter_instance.kernel_spectrum * (
+            pp_power_spectrum / filter_instance.pp.params["fs"] ** 2
+        )
         return primary_spectrum
 
     def _calculate_combined_spectrum(self, filter_instance, secondary_filter_instance):
