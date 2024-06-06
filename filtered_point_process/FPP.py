@@ -56,17 +56,13 @@ class FilteredPointProcess(Filter):
         for i, filter_name in enumerate(self.filter_names):
             filter_instance = self.filter_instances[filter_name]
             if i == 0:
-                spectra[f"pp * {self.filter_labels[i]}"] = self._calculate_spectrum(
-                    filter_instance
-                )
+                spectrum = self._calculate_spectrum(filter_instance) 
+                spectra[f"pp * {self.filter_labels[i]}"] = spectrum
             else:
-                spectra[f"pp * {self.filter_labels[i]}"] = self._calculate_spectrum(
-                    filter_instance
-                )
+                previous_spectrum = spectra[f"pp * {' * '.join(self.filter_labels[:i])}"]
+                current_spectrum = filter_instance.kernel_spectrum 
+                combined_spectrum = previous_spectrum * current_spectrum
                 combined_spectrum_name = f"pp * {' * '.join(self.filter_labels[:i+1])}"
-                combined_spectrum = self._calculate_combined_spectrum(
-                    filter_instance, self.filter_instances[self.filter_names[i - 1]]
-                )
                 spectra[combined_spectrum_name] = combined_spectrum
         return spectra
 
@@ -91,10 +87,3 @@ class FilteredPointProcess(Filter):
             pp_power_spectrum / filter_instance.pp.params["fs"] ** 2
         )
         return primary_spectrum
-
-    def _calculate_combined_spectrum(self, filter_instance, secondary_filter_instance):
-        """Helper function to calculate combined power spectrum for given filter instances."""
-        primary_spectrum = self._calculate_spectrum(filter_instance)
-        secondary_spectrum = self._calculate_spectrum(secondary_filter_instance)
-        combined_spectrum = primary_spectrum * secondary_spectrum
-        return combined_spectrum
