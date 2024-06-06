@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-
 class Visualizer:
     """Class to visualize the filtered point process."""
 
@@ -9,206 +8,101 @@ class Visualizer:
         self.fpp = fpp_instance
 
     def plot_all_stages(self):
-        fig, axs = plt.subplots(6, 2, figsize=(15, 18))
+        # Gather data for plotting
+        filters = self.fpp.get_filters()
+        convolutions = self.fpp.perform_convolutions()
+        spectra = self.fpp.get_spectra()
 
-        # Model 1 CIF
-        if self.fpp.pp_1:
-            if hasattr(self.fpp.pp_1, "cif_time_axis") and hasattr(
-                self.fpp.pp_1, "cif_realization"
-            ):
-                axs[0, 0].plot(
-                    self.fpp.pp_1.cif_time_axis, self.fpp.pp_1.cif_realization
-                )
-                axs[0, 0].set_title("Model 1 - CIF (Time Domain)")
-                axs[0, 0].set_xlabel("Time (s)")
-                axs[0, 0].set_ylabel("Intensity")
+        # Total number of rows required: CIF + Point Process + Filters + Convolutions
+        num_rows_time = 2 + len(filters) + len(convolutions)
+        num_rows_freq = 2 + len(filters) + len(spectra)
 
-            if hasattr(self.fpp.pp_1, "cif_frequencies") and hasattr(
-                self.fpp.pp_1, "cif_PSD"
-            ):
-                axs[0, 1].plot(self.fpp.pp_1.cif_frequencies, self.fpp.pp_1.cif_PSD)
-                axs[0, 1].set_title("Model 1 - CIF (Power Spectrum)")
-                axs[0, 1].set_xlabel("Frequency (Hz)")
-                axs[0, 1].set_ylabel("Power")
+        fig_time, axs_time = plt.subplots(num_rows_time, 1, figsize=(15, num_rows_time * 8))
+        fig_freq, axs_freq = plt.subplots(num_rows_freq, 1, figsize=(15, num_rows_freq * 8))
 
-                # Set x-axis limits based on center frequency and peak width
-                if (
-                    "center_frequency" in self.fpp.pp_1.params
-                    and "peak_width" in self.fpp.pp_1.params
-                ):
-                    x_min = (
-                        self.fpp.pp_1.params["center_frequency"]
-                        - 5 * self.fpp.pp_1.params["peak_width"]
-                    )
-                    x_max = (
-                        self.fpp.pp_1.params["center_frequency"]
-                        + 5 * self.fpp.pp_1.params["peak_width"]
-                    )
-                    axs[0, 1].set_xlim([x_min, x_max])
+        row_time = 0
+        row_freq = 0
 
-        # Model 1 Point Process
-        if self.fpp.pp_1:
-            if hasattr(self.fpp.pp_1, "pp_events"):
-                axs[1, 0].eventplot(self.fpp.pp_1.pp_events, colors="black")
-                axs[1, 0].set_title("Model 1 - Point Process (Time Domain)")
-                axs[1, 0].set_xlabel("Time (s)")
-                axs[1, 0].set_ylabel("Events")
-                axs[1, 0].spines["top"].set_visible(False)
-                axs[1, 0].spines["right"].set_visible(False)
-                axs[1, 0].spines["left"].set_visible(False)
-                axs[1, 0].spines["bottom"].set_visible(False)
-                axs[1, 0].set_xticks([])
-                axs[1, 0].set_yticks([])
+        # CIF (Time Domain)
+        if hasattr(self.fpp.pp, "cif_time_axis") and hasattr(self.fpp.pp, "cif_realization"):
+            axs_time[row_time].plot(self.fpp.pp.cif_time_axis, self.fpp.pp.cif_realization)
+            axs_time[row_time].set_title("CIF (Time Domain)")
+            axs_time[row_time].set_xlabel("Time (s)")
+            axs_time[row_time].set_ylabel("Intensity")
+            row_time += 1
 
-            if hasattr(self.fpp.pp_1, "pp_frequencies") and hasattr(
-                self.fpp.pp_1, "pp_PSD"
-            ):
-                axs[1, 1].plot(self.fpp.pp_1.pp_frequencies, self.fpp.pp_1.pp_PSD)
-                axs[1, 1].set_title("Model 1 - Point Process (Power Spectrum)")
-                axs[1, 1].set_xlabel("Frequency (Hz)")
-                axs[1, 1].set_ylabel("Power")
+        # CIF (Frequency Domain)
+        if hasattr(self.fpp.pp, "cif_frequencies") and hasattr(self.fpp.pp, "cif_PSD"):
+            axs_freq[row_freq].plot(self.fpp.pp.cif_frequencies, self.fpp.pp.cif_PSD)
+            axs_freq[row_freq].set_title("CIF (Power Spectrum)")
+            axs_freq[row_freq].set_xlabel("Frequency (Hz)")
+            axs_freq[row_freq].set_ylabel("Power")
+            if "center_frequency" in self.fpp.pp.params and "peak_width" in self.fpp.pp.params:
+                x_min = self.fpp.pp.params["center_frequency"] - 5 * self.fpp.pp.params["peak_width"]
+                x_max = self.fpp.pp.params["center_frequency"] + 5 * self.fpp.pp.params["peak_width"]
+                axs_freq[row_freq].set_xlim([x_min, x_max])
+            row_freq += 1
 
-                # Set x-axis limits based on center frequency and peak width
-                if (
-                    "center_frequency" in self.fpp.pp_1.params
-                    and "peak_width" in self.fpp.pp_1.params
-                ):
-                    x_min = (
-                        self.fpp.pp_1.params["center_frequency"]
-                        - 5 * self.fpp.pp_1.params["peak_width"]
-                    )
-                    x_max = (
-                        self.fpp.pp_1.params["center_frequency"]
-                        + 5 * self.fpp.pp_1.params["peak_width"]
-                    )
-                    axs[1, 1].set_xlim([x_min, x_max])
+        # Point Process (Time Domain)
+        if hasattr(self.fpp.pp, "pp_events"):
+            axs_time[row_time].eventplot(self.fpp.pp.pp_events, colors="black")
+            axs_time[row_time].set_title("Point Process (Time Domain)")
+            axs_time[row_time].set_xlabel("Time (s)")
+            axs_time[row_time].set_ylabel("Events")
+            axs_time[row_time].spines["top"].set_visible(False)
+            axs_time[row_time].spines["right"].set_visible(False)
+            axs_time[row_time].spines["left"].set_visible(False)
+            axs_time[row_time].spines["bottom"].set_visible(False)
+            axs_time[row_time].set_xticks([])
+            axs_time[row_time].set_yticks([])
+            row_time += 1
 
-        # Model 1 Filter 1
-        if (
-            hasattr(self.fpp, "filter_1_instance_model_1")
-            and self.fpp.filter_1_instance_model_1
-        ):
-            filter_1_outputs = self.fpp.get_individual_outputs().get(
-                "model_1_filter_1", {}
-            )
-            if "time_axis" in filter_1_outputs and "kernel" in filter_1_outputs:
-                axs[2, 0].plot(
-                    filter_1_outputs["time_axis"],
-                    filter_1_outputs["kernel"],
-                    color="blue",
-                )
-                axs[2, 0].set_title("Model 1 - Filter 1 Kernel (Time Domain)")
-                axs[2, 0].set_xlabel("Time (s)")
-                axs[2, 0].set_ylabel("Kernel")
+        # Point Process (Frequency Domain)
+        if hasattr(self.fpp.pp, "pp_frequencies") and hasattr(self.fpp.pp, "pp_PSD"):
+            axs_freq[row_freq].plot(self.fpp.pp.pp_frequencies, self.fpp.pp.pp_PSD)
+            axs_freq[row_freq].set_title("Point Process (Power Spectrum)")
+            axs_freq[row_freq].set_xlabel("Frequency (Hz)")
+            axs_freq[row_freq].set_ylabel("Power")
+            if "center_frequency" in self.fpp.pp.params and "peak_width" in self.fpp.pp.params:
+                x_min = self.fpp.pp.params["center_frequency"] - 5 * self.fpp.pp.params["peak_width"]
+                x_max = self.fpp.pp.params["center_frequency"] + 5 * self.fpp.pp.pp.params["peak_width"]
+                axs_freq[row_freq].set_xlim([x_min, x_max])
+            row_freq += 1
 
-            if (
-                "frequencies" in filter_1_outputs
-                and "power_spectrum" in filter_1_outputs
-            ):
-                axs[2, 1].loglog(
-                    filter_1_outputs["frequencies"],
-                    filter_1_outputs["power_spectrum"],
-                    color="blue",
-                )
-                axs[2, 1].set_title("Model 1 - Filter 1 Kernel (Power Spectrum)")
-                axs[2, 1].set_xlabel("Frequency (Hz)")
-                axs[2, 1].set_ylabel("Power")
+        # Filters (Time Domain and Frequency Domain)
+        for filter_name, filter_output in filters.items():
+            label = self.fpp.filters[filter_name]  # Get the actual label of the filter
+            if "time_axis" in filter_output and "kernel" in filter_output:
+                axs_time[row_time].plot(filter_output["time_axis"], filter_output["kernel"])
+                axs_time[row_time].set_title(f"{label} Kernel (Time Domain)")
+                axs_time[row_time].set_xlabel("Time (s)")
+                axs_time[row_time].set_ylabel("Kernel")
+                row_time += 1
+            
+            if "frequencies" in filter_output and "power_spectrum" in filter_output:
+                axs_freq[row_freq].loglog(filter_output["frequencies"], filter_output["power_spectrum"])
+                axs_freq[row_freq].set_title(f"{label} Kernel (Power Spectrum)")
+                axs_freq[row_freq].set_xlabel("Frequency (Hz)")
+                axs_freq[row_freq].set_ylabel("Power")
+                row_freq += 1
 
-        # Model 1 Filter 2 (Optional)
-        if (
-            hasattr(self.fpp, "filter_2_instance_model_1")
-            and self.fpp.filter_2_instance_model_1
-        ):
-            filter_2_outputs = self.fpp.get_individual_outputs().get(
-                "model_1_filter_2", {}
-            )
-            if "time_axis" in filter_2_outputs and "kernel" in filter_2_outputs:
-                axs[3, 0].plot(
-                    filter_2_outputs["time_axis"],
-                    filter_2_outputs["kernel"],
-                    color="green",
-                )
-                axs[3, 0].set_title("Model 1 - Filter 2 Kernel (Time Domain)")
-                axs[3, 0].set_xlabel("Time (s)")
-                axs[3, 0].set_ylabel("Kernel")
+        # Convolutions (Time Domain)
+        for label, sim_PSPs in convolutions.items():
+            min_len = min(len(self.fpp.pp.pp_time_axis), len(sim_PSPs))
+            axs_time[row_time].plot(self.fpp.pp.pp_time_axis[:min_len], sim_PSPs[:min_len], color="purple")
+            axs_time[row_time].set_title(f"Convolution with {label} (Time Domain)")
+            axs_time[row_time].set_xlabel("Time (s)")
+            axs_time[row_time].set_ylabel("Amplitude")
+            row_time += 1
 
-            if (
-                "frequencies" in filter_2_outputs
-                and "power_spectrum" in filter_2_outputs
-            ):
-                axs[3, 1].loglog(
-                    filter_2_outputs["frequencies"],
-                    filter_2_outputs["power_spectrum"],
-                    color="green",
-                )
-                axs[3, 1].set_title("Model 1 - Filter 2 Kernel (Power Spectrum)")
-                axs[3, 1].set_xlabel("Frequency (Hz)")
-                axs[3, 1].set_ylabel("Power")
+        # Spectra for Convolutions (Frequency Domain)
+        for label, spectrum in spectra.items():
+            axs_freq[row_freq].loglog(self.fpp.pp.pp_frequencies, spectrum, color="purple")
+            axs_freq[row_freq].set_title(f"Convolution with {label} (Power Spectrum)")
+            axs_freq[row_freq].set_xlabel("Frequency (Hz)")
+            axs_freq[row_freq].set_ylabel("Power")
+            row_freq += 1
 
-        # Model 1 Convolution with Filter 1
-        if hasattr(self.fpp, "perform_convolutions"):
-            convolution_results_1 = self.fpp.perform_convolutions().get("model_1", {})
-            if (
-                "sim_PSPs" in convolution_results_1
-                and len(convolution_results_1["sim_PSPs"]) > 0
-            ):
-                min_len = min(
-                    len(self.fpp.pp_1.pp_time_axis),
-                    len(convolution_results_1["sim_PSPs"]),
-                )
-                axs[4, 0].plot(
-                    self.fpp.pp_1.pp_time_axis[:min_len],
-                    convolution_results_1["sim_PSPs"][:min_len],
-                    color="purple",
-                )
-                axs[4, 0].set_title("Model 1 - Convolution with Filter 1 (Time Domain)")
-                axs[4, 0].set_xlabel("Time (s)")
-                axs[4, 0].set_ylabel("Amplitude")
-
-            if "sim_PSPs" in convolution_results_1:
-                h_spectrum_1 = self.fpp._get_h_spectra().get(
-                    "model_1_filter_1", [[], []]
-                )[1]
-                if len(h_spectrum_1) > 0:
-                    axs[4, 1].loglog(
-                        self.fpp.pp_1.pp_frequencies, h_spectrum_1, color="purple"
-                    )
-                    axs[4, 1].set_title(
-                        "Model 1 - Convolution with Filter 1 (Power Spectrum)"
-                    )
-                    axs[4, 1].set_xlabel("Frequency (Hz)")
-                    axs[4, 1].set_ylabel("Power")
-
-        # Model 1 Convolution with Filter 2 (Optional)
-        if (
-            hasattr(self.fpp, "filter_2_instance_model_1")
-            and self.fpp.filter_2_instance_model_1
-            and "sim_LFP" in convolution_results_1
-        ):
-            min_len = min(
-                len(self.fpp.pp_1.pp_time_axis), len(convolution_results_1["sim_LFP"])
-            )
-            axs[5, 0].plot(
-                self.fpp.pp_1.pp_time_axis[:min_len],
-                convolution_results_1["sim_LFP"][:min_len],
-                color="orange",
-            )
-            axs[5, 0].set_title("Model 1 - Convolution with Filter 2 (Time Domain)")
-            axs[5, 0].set_xlabel("Time (s)")
-            axs[5, 0].set_ylabel("Amplitude")
-
-            h_spectrum_2 = self.fpp._get_h_spectra().get("model_1_filter_2", [[], []])[
-                1
-            ]
-            if len(h_spectrum_2) > 0:
-                axs[5, 1].loglog(
-                    self.fpp.pp_1.pp_frequencies, h_spectrum_2, color="orange"
-                )
-                axs[5, 1].set_title(
-                    "Model 1 - Convolution with Filter 2 (Power Spectrum)"
-                )
-                axs[5, 1].set_xlabel("Frequency (Hz)")
-                axs[5, 1].set_ylabel("Power")
-
-        plt.tight_layout()
+        fig_time.tight_layout()
+        fig_freq.tight_layout()
         plt.show()

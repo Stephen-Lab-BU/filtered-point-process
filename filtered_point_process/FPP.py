@@ -1,148 +1,63 @@
 from .filters import Filter
 import numpy as np
 
-
 class FilteredPointProcess(Filter):
     """Class to interact with the filtered point process."""
 
-    def __init__(
-        self,
-        filter_1_model_1=None,
-        filter_2_model_1=None,
-        filter_1_model_2=None,
-        filter_2_model_2=None,
-        model_1=None,
-        model_2=None,
-        filter_1_config_file=None,
-        filter_2_config_file=None,
-    ):
-        super().__init__(
-            filter_1_model_1,
-            filter_2_model_1,
-            filter_1_model_2,
-            filter_2_model_2,
-            model_1,
-            model_2,
-            filter_1_config_file,
-            filter_2_config_file,
-        )
+    def __init__(self, filters=None, model=None):
+        super().__init__(filters=filters, model=model)
+        self.filter_names = list(filters.keys())  
+        self.filter_labels = list(filters.values())  
 
-    def get_individual_outputs(self):
+    def get_filters(self):
         outputs = {}
-
-        if (
-            hasattr(self, "filter_1_instance_model_1")
-            and self.filter_1_instance_model_1
-        ):
-            outputs["model_1_filter_1"] = {
-                "time_axis": self.filter_1_instance_model_1.kernel_time_axis,
-                "kernel": self.filter_1_instance_model_1.kernel,
-                "power_spectrum": self.filter_1_instance_model_1.kernel_spectrum,
-                "frequencies": self.filter_1_instance_model_1.frequencies,
+        for filter_name, filter_instance in zip(self.filter_names, self.filter_instances.values()):
+            outputs[filter_name] = {
+                "time_axis": filter_instance.kernel_time_axis,
+                "kernel": filter_instance.kernel,
+                "power_spectrum": filter_instance.kernel_spectrum,
+                "frequencies": filter_instance.frequencies,
             }
-
-        if (
-            hasattr(self, "filter_2_instance_model_1")
-            and self.filter_2_instance_model_1
-        ):
-            outputs["model_1_filter_2"] = {
-                "time_axis": self.filter_2_instance_model_1.time_axis,
-                "kernel": self.filter_2_instance_model_1.kernel,
-                "power_spectrum": self.filter_2_instance_model_1.kernel_spectrum,
-                "frequencies": self.filter_2_instance_model_1.frequencies,
-            }
-
-        if (
-            hasattr(self, "filter_1_instance_model_2")
-            and self.filter_1_instance_model_2
-        ):
-            outputs["model_2_filter_1"] = {
-                "time_axis": self.filter_1_instance_model_2.kernel_time_axis,
-                "kernel": self.filter_1_instance_model_2.kernel,
-                "power_spectrum": self.filter_1_instance_model_2.kernel_spectrum,
-                "frequencies": self.filter_1_instance_model_2.frequencies,
-            }
-
-        if (
-            hasattr(self, "filter_2_instance_model_2")
-            and self.filter_2_instance_model_2
-        ):
-            outputs["model_2_filter_2"] = {
-                "time_axis": self.filter_2_instance_model_2.time_axis,
-                "kernel": self.filter_2_instance_model_2.kernel,
-                "power_spectrum": self.filter_2_instance_model_2.kernel_spectrum,
-                "frequencies": self.filter_2_instance_model_2.frequencies,
-            }
-
         return outputs
 
     def perform_convolutions(self):
         """Perform convolutions with the kernels and spikes stored in the models."""
         results = {}
+        spike_times = self.model.pp_events
+        time_axis = self.model.pp_time_axis
+        fs = self.model.params["fs"]
 
-        if self.pp_1:
-            spike_times_model_1 = self.pp_1.pp_events
-            time_axis_model_1 = self.pp_1.pp_time_axis
-            fs_model_1 = self.pp_1.params["fs"]
+        spike_train = self._create_spike_train(spike_times, time_axis, fs)
 
-            spike_train_model_1 = self._create_spike_train(
-                spike_times_model_1, time_axis_model_1, fs_model_1
-            )
-
-            if (
-                hasattr(self, "filter_1_instance_model_1")
-                and self.filter_1_instance_model_1
-            ):
-                kernel_1 = self.filter_1_instance_model_1.kernel
+        for i, (filter_name, filter_instance) in enumerate(zip(self.filter_labels, self.filter_instances.values())):
+            if i == 0:
+                sim_PSPs = self._convolve_spikes_with_kernels(spike_train, filter_instance.kernel, fs)
+                results[f"pp ⨂ {filter_name}"] = sim_PSPs
             else:
-                kernel_1 = None
-            if (
-                hasattr(self, "filter_2_instance_model_1")
-                and self.filter_2_instance_model_1
-            ):
-                kernel_2 = self.filter_2_instance_model_1.kernel
-            else:
-                kernel_2 = None
-            sim_PSPs_model_1, sim_LFP_model_1 = self._convolve_spikes_with_kernels(
-                spike_train_model_1, kernel_1, kernel_2, fs_model_1
-            )
-            results["model_1"] = {
-                "sim_PSPs": sim_PSPs_model_1,
-                "sim_LFP": sim_LFP_model_1,
-            }
-
-        if self.pp_2:
-            spike_times_model_2 = self.pp_2.pp_events
-            time_axis_model_2 = self.pp_2.pp_time_axis
-            fs_model_2 = self.pp_2.params["fs"]
-
-            spike_train_model_2 = self._create_spike_train(
-                spike_times_model_2, time_axis_model_2, fs_model_2
-            )
-
-            if (
-                hasattr(self, "filter_1_instance_model_2")
-                and self.filter_1_instance_model_2
-            ):
-                kernel_1 = self.filter_1_instance_model_2.kernel
-            else:
-                kernel_1 = None
-            if (
-                hasattr(self, "filter_2_instance_model_2")
-                and self.filter_2_instance_model_2
-            ):
-                kernel_2 = self.filter_2_instance_model_2.kernel
-            else:
-                kernel_2 = None
-            sim_PSPs_model_2, sim_LFP_model_2 = self._convolve_spikes_with_kernels(
-                spike_train_model_2, kernel_1, kernel_2, fs_model_2
-            )
-            results["model_2"] = {
-                "sim_PSPs": sim_PSPs_model_2,
-                "sim_LFP": sim_LFP_model_2,
-            }
-
+                previous_filter_label = " ⨂ ".join(self.filter_labels[:i])
+                combined_label = f"pp ⨂ {previous_filter_label} ⨂ {filter_name}"
+                sim_PSPs = self._convolve_spikes_with_kernels(
+                    results[f"pp ⨂ {previous_filter_label}"], filter_instance.kernel, fs
+                )
+                results[combined_label] = sim_PSPs
         return results
+
+    def get_spectra(self):
+        """Calculate the theoretical power spectrum of the filter."""
+        spectra = {}
+        
+        for i, filter_name in enumerate(self.filter_names):
+            filter_instance = self.filter_instances[filter_name]
+            if i == 0:
+                spectra[f"pp * {self.filter_labels[i]}"] = self._calculate_spectrum(filter_instance)
+            else:
+                spectra[f"pp * {self.filter_labels[i]}"] = self._calculate_spectrum(filter_instance)
+                combined_spectrum_name = f"pp * {' * '.join(self.filter_labels[:i+1])}"
+                combined_spectrum = self._calculate_combined_spectrum(
+                    filter_instance, self.filter_instances[self.filter_names[i - 1]]
+                )
+                spectra[combined_spectrum_name] = combined_spectrum
+        return spectra
 
     def _create_spike_train(self, spike_times, time_axis, fs):
         """Create a spike train from the spike times and the time axis."""
@@ -151,76 +66,22 @@ class FilteredPointProcess(Filter):
         spike_train[spike_indices] = 1
         return spike_train
 
-    def _convolve_spikes_with_kernels(self, spike_train, kernel_1, kernel_2, fs):
+    def _convolve_spikes_with_kernels(self, spike_train, kernel, fs):
         """Helper function to perform convolutions with given kernels and spike train."""
-
         num_samples = len(spike_train)
-        sim_PSPs = np.zeros(num_samples)
-        sim_LFP = np.zeros(num_samples)
+        sim_PSPs = np.convolve(spike_train, kernel, mode="full")[:num_samples] / fs
+        return sim_PSPs
 
-        # Perform convolution for each spike event
-        sim_PSPs = np.convolve(spike_train, kernel_1, mode="full")[:num_samples] / fs
-
-        if kernel_2 is not None:
-            sim_LFP = np.convolve(sim_PSPs, kernel_2, mode="full")[:num_samples] / fs
-        else:
-            sim_LFP = sim_PSPs
-
-        return sim_PSPs, sim_LFP
-
-    def _get_h_spectra(self):
-        """Calculate the theoretical power spectrum of the filter."""
-        spectra = {}
-        if (
-            hasattr(self, "filter_1_instance_model_1")
-            and self.filter_1_instance_model_1
-        ):
-            secondary_filter = (
-                self.filter_2_instance_model_1
-                if hasattr(self, "filter_2_instance_model_1")
-                else None
-            )
-            spectra["model_1_filter_1"] = self._calculate_spectrum(
-                self.filter_1_instance_model_1, secondary_filter
-            )
-        if (
-            hasattr(self, "filter_2_instance_model_1")
-            and self.filter_2_instance_model_1
-        ):
-            spectra["model_1_filter_2"] = self._calculate_spectrum(
-                self.filter_2_instance_model_1
-            )
-        if (
-            hasattr(self, "filter_1_instance_model_2")
-            and self.filter_1_instance_model_2
-        ):
-            secondary_filter = (
-                self.filter_2_instance_model_2
-                if hasattr(self, "filter_2_instance_model_2")
-                else None
-            )
-            spectra["model_2_filter_1"] = self._calculate_spectrum(
-                self.filter_1_instance_model_2, secondary_filter
-            )
-        if (
-            hasattr(self, "filter_2_instance_model_2")
-            and self.filter_2_instance_model_2
-        ):
-            spectra["model_2_filter_2"] = self._calculate_spectrum(
-                self.filter_2_instance_model_2
-            )
-        return spectra
-
-    def _calculate_spectrum(self, filter_instance, secondary_filter_instance=None):
+    def _calculate_spectrum(self, filter_instance):
         """Helper function to calculate power spectrum for a given filter instance."""
         S = filter_instance.pp.pp_PSD
-        f = filter_instance.pp.params["frequencies"]
         pp_power_spectrum = np.squeeze(np.array(S))
-        h_power_spectrum = filter_instance.kernel_spectrum * (
-            pp_power_spectrum / filter_instance.pp.params["fs"] ** 2
-        )
+        primary_spectrum = filter_instance.kernel_spectrum * (pp_power_spectrum / filter_instance.pp.params["fs"] ** 2)
+        return primary_spectrum
 
-        if secondary_filter_instance is not None:
-            h_power_spectrum *= secondary_filter_instance.kernel_spectrum
-
-        return f, h_power_spectrum
+    def _calculate_combined_spectrum(self, filter_instance, secondary_filter_instance):
+        """Helper function to calculate combined power spectrum for given filter instances."""
+        primary_spectrum = self._calculate_spectrum(filter_instance)
+        secondary_spectrum = self._calculate_spectrum(secondary_filter_instance)
+        combined_spectrum = primary_spectrum * secondary_spectrum
+        return combined_spectrum

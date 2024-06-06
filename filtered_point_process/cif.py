@@ -155,7 +155,7 @@ class ConditionalIntensityFunction(ParamSetter, GlobalSeed):
         intensity_realization = self._simulate_gaussian_process_approx_fd(
             cox_cif_S, len(self._time_axis), self.params["fs"]
         )
-        return np.real_if_close(intensity_realization[0])
+        return np.abs(np.real_if_close(intensity_realization[0]))
 
     def _compute_cox_cif_S(self):
         """Compute theoretical power spectrum for the Gaussian process."""
