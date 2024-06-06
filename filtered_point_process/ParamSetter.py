@@ -80,18 +80,6 @@ class ParamSetter:
                     "Default filter parameters are being used (see filters.py for parameter values for reporting purposes and equations.)"
                 )
 
-    def _default_params(self):
-        return {
-            "peak_height": 50000,
-            "center_frequency": 1,
-            "peak_width": 0.01,
-            "fs": 10000,
-            "T": 3,
-            "Nsims": 1,
-            "method": "gaussian",
-            "lambda_0": [100],
-        }
-
 
 class GlobalSeed:
     global_seed = None
