@@ -56,11 +56,13 @@ class FilteredPointProcess(Filter):
         for i, filter_name in enumerate(self.filter_names):
             filter_instance = self.filter_instances[filter_name]
             if i == 0:
-                spectrum = self._calculate_spectrum(filter_instance) 
+                spectrum = self._calculate_spectrum(filter_instance)
                 spectra[f"pp * {self.filter_labels[i]}"] = spectrum
             else:
-                previous_spectrum = spectra[f"pp * {' * '.join(self.filter_labels[:i])}"]
-                current_spectrum = filter_instance.kernel_spectrum 
+                previous_spectrum = spectra[
+                    f"pp * {' * '.join(self.filter_labels[:i])}"
+                ]
+                current_spectrum = filter_instance.kernel_spectrum
                 combined_spectrum = previous_spectrum * current_spectrum
                 combined_spectrum_name = f"pp * {' * '.join(self.filter_labels[:i+1])}"
                 spectra[combined_spectrum_name] = combined_spectrum
