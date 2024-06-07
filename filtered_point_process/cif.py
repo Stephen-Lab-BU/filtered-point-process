@@ -10,7 +10,6 @@ from .helpers import (
 )
 from .ParamSetter import ParamSetter, GlobalSeed
 from .utils import nextpow2
-from scipy.stats import norm
 
 
 class ConditionalIntensityFunction(ParamSetter, GlobalSeed):
