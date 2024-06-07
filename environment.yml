@@ -6,6 +6,7 @@ dependencies:
   - numpy
   - matplotlib
   - ipykernel
+  - scipy
   - pip
   - pytest
   - pip:
