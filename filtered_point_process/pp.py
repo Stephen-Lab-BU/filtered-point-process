@@ -2,8 +2,6 @@ import numpy as np
 import json
 import os
 import warnings
-from scipy.fftpack import ifft, fft, fftfreq
-from scipy.stats import norm
 import math
 
 from .cif import ConditionalIntensityFunction

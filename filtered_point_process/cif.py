@@ -2,7 +2,6 @@ import numpy as np
 import json
 import os
 import warnings
-from scipy.fftpack import ifft, fft, fftfreq
 from .helpers import (
     TimeDomain,
     FrequencyDomain,
