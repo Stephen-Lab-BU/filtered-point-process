@@ -83,14 +83,14 @@ class FilterBase:
         )
 
         # Normalize psc_t by its maximum value
-        self._psc_t /= np.max(self._psc_t)
+        #self._psc_t /= np.max(self._psc_t)
 
         self._psc_f = 1 / (
             1 / self.filter_params["tau_decay"] + 1j * 2 * np.pi * self.frequencies
         ) - 1 / (1 / self.filter_params["tau_rise"] + 1j * 2 * np.pi * self.frequencies)
 
         # Normalize psc_f by its maximum value
-        self._psc_f /= np.max(np.abs(self._psc_f))
+        #self._psc_f /= np.max(np.abs(self._psc_f))
 
         self._psc_fsym = self._psc_f.copy()
         self._psc_fsym[int(np.floor(self.pp.params["NFFT"] / 2 + 1)) :] = np.flipud(
@@ -172,7 +172,7 @@ class LeakyIntegratorFilter(FilterBase):
             np.conj(self._li_fsym[1 : int(np.floor(self.pp.params["NFFT"] / 2))])
         )
 
-        self._li_fsym /= np.max(np.abs(self._li_fsym))
+        #self._li_fsym /= np.max(np.abs(self._li_fsym))
 
         self._li_S = np.abs(self._li_fsym) ** 2
 
