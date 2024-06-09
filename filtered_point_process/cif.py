@@ -156,7 +156,7 @@ class ConditionalIntensityFunction(ParamSetter, GlobalSeed):
         )
         return np.abs(np.real_if_close(intensity_realization[0]))
 
-    def _compute_cox_cif_S(self):
+    def _compute_cox_cif_S_old(self):
         """Compute theoretical power spectrum for the Gaussian process."""
 
         cox_cif_S = self.params["peak_height"] * np.exp(
@@ -170,6 +170,46 @@ class ConditionalIntensityFunction(ParamSetter, GlobalSeed):
         Mby2 = self.params["NFFT"] // 2
         cox_cif_S[Mby2 + 1 :] = np.flipud(cox_cif_S[1:Mby2])
         return cox_cif_S
+    
+    def _compute_cox_cif_S(self):
+        """Compute theoretical power spectrum for the Gaussian process with multiple peaks."""
+
+        frequencies = self.params["frequencies"].squeeze()
+        Mby2 = self.params["NFFT"] // 2
+
+        # Initialize the power spectrum with zeros
+        cox_cif_S = np.zeros_like(frequencies)
+
+        # Extract the base parameters
+        center_frequencies = [self.params["center_frequency"]]
+        peak_widths = [self.params["peak_width"]]
+        peak_heights = [self.params["peak_height"]]
+
+        # Check for additional sets of parameters
+        index = 2
+        while f"center_frequency_{index}" in self.params:
+            center_frequencies.append(self.params[f"center_frequency_{index}"])
+            peak_widths.append(self.params[f"peak_width_{index}"])
+            peak_heights.append(self.params[f"peak_height_{index}"])
+            index += 1
+
+        # Sum the contributions from all Gaussian peaks
+        for center_frequency, peak_width, peak_height in zip(center_frequencies, peak_widths, peak_heights):
+            cox_cif_S += peak_height * np.exp(
+                -(
+                    (frequencies - center_frequency) ** 2
+                )
+                / (2 * peak_width ** 2)
+            )
+
+        # Enforce zero DC component
+        cox_cif_S[0] = 0
+
+        # Enforce symmetry for the second half of the spectrum
+        cox_cif_S[Mby2 + 1:] = np.flipud(cox_cif_S[1:Mby2])
+
+        return cox_cif_S
+
 
     def _simulate_gaussian_process_approx_fd(self, S, N, fs):
         """Generate time domain realizations of a Gaussian process from the frequency
