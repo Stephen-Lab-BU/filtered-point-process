@@ -73,8 +73,12 @@ class FilterBase:
 
     def compute_psc(self):
         """Compute the post-synaptic current in both time and frequency domain."""
+        #self.filter_params["filter_time_vector"] = np.arange(
+        #    0, 0.040, 1 / self.pp.params["fs"]
+        #)
+
         self.filter_params["filter_time_vector"] = np.arange(
-            0, 0.040, 1 / self.pp.params["fs"]
+            0, self.pp.pp_params['T'], 1 / self.pp.params["fs"]
         )
         self._psc_t = np.exp(
             -self.filter_params["filter_time_vector"] / self.filter_params["tau_decay"]
@@ -83,14 +87,14 @@ class FilterBase:
         )
 
         # Normalize psc_t by its maximum value
-        #self._psc_t /= np.max(self._psc_t)
+        self._psc_t /= np.max(self._psc_t)
 
         self._psc_f = 1 / (
             1 / self.filter_params["tau_decay"] + 1j * 2 * np.pi * self.frequencies
         ) - 1 / (1 / self.filter_params["tau_rise"] + 1j * 2 * np.pi * self.frequencies)
 
         # Normalize psc_f by its maximum value
-        #self._psc_f /= np.max(np.abs(self._psc_f))
+        self._psc_f /= np.abs(np.max(self._psc_t)**2)
 
         self._psc_fsym = self._psc_f.copy()
         self._psc_fsym[int(np.floor(self.pp.params["NFFT"] / 2 + 1)) :] = np.flipud(
@@ -166,13 +170,15 @@ class LeakyIntegratorFilter(FilterBase):
         self._li_t = np.exp(
             -self.filter_params["filter_time_vector"] * self.filter_params["A"]
         )
+
+        self._li_t /= np.max(self._li_t)
         self._li_f = 1 / (self.filter_params["A"] + 1j * 2 * np.pi * self.frequencies)
         self._li_fsym = self._li_f.copy()
         self._li_fsym[int(np.floor(self.pp.params["NFFT"] / 2 + 1)) :] = np.flipud(
             np.conj(self._li_fsym[1 : int(np.floor(self.pp.params["NFFT"] / 2))])
         )
 
-        #self._li_fsym /= np.max(np.abs(self._li_fsym))
+        self._li_fsym /= np.abs(np.max(self._li_t))**2
 
         self._li_S = np.abs(self._li_fsym) ** 2
 
