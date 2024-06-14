@@ -78,7 +78,7 @@ class FilterBase:
         #)
 
         self.filter_params["filter_time_vector"] = np.arange(
-            0, self.pp.pp_params['T'], 1 / self.pp.params["fs"]
+            0, self.model.params['T'], 1 / self.pp.params["fs"]
         )
         self._psc_t = np.exp(
             -self.filter_params["filter_time_vector"] / self.filter_params["tau_decay"]
