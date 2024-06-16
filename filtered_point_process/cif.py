@@ -50,7 +50,7 @@ class ConditionalIntensityFunction(ParamSetter, GlobalSeed):
             return self._compute_homogeneous_cif_S()
 
         elif self.params["method"] == "AR(1)":
-            return self._compute_ar1_cif_S()
+            return self._compute_ar_cif_S()
 
         else:
             raise ValueError("Invalid method")
@@ -60,7 +60,7 @@ class ConditionalIntensityFunction(ParamSetter, GlobalSeed):
         method_simulation = {
             "gaussian": self._simulate_gaussian,
             "Homogeneous_Poisson": self._simulate_homog_pois,
-            "AR(1)": self._simulate_ar1,
+            "AR(1)": self._simulate_ar,
         }
 
         simulation_func = method_simulation.get(self.params["method"])
@@ -78,9 +78,10 @@ class ConditionalIntensityFunction(ParamSetter, GlobalSeed):
 
         N = self.params["T"] * self.params["fs"]
         if nextpow2(N) < 100:
-            return 10000
+            return 50000
         else:
-            return 100 * nextpow2(N)
+            #return 100 * nextpow2(N)
+            return 50000 + nextpow2(N)
 
     def __generate_frequency_vector(self, method="total"):
         """
@@ -101,7 +102,7 @@ class ConditionalIntensityFunction(ParamSetter, GlobalSeed):
         if method == "total":
             # Generate the frequency vector
             frequencies = np.fft.fftfreq(self.params["NFFT"], d=1 / self.params["fs"])
-            return np.abs(frequencies)
+            return frequencies # was abs()
         elif method == "positive":
             frequencies = np.fft.fftfreq(self.params["NFFT"], d=1 / self.params["fs"])
             return frequencies[: self.params["NFFT"] // 2]
@@ -154,7 +155,7 @@ class ConditionalIntensityFunction(ParamSetter, GlobalSeed):
         intensity_realization = self._simulate_gaussian_process_approx_fd(
             cox_cif_S, len(self._time_axis), self.params["fs"]
         )
-        return np.abs(np.real_if_close(intensity_realization[0]))
+        return intensity_realization[0]
 
     def _compute_cox_cif_S_old(self):
         """Compute theoretical power spectrum for the Gaussian process."""
@@ -267,7 +268,7 @@ class ConditionalIntensityFunction(ParamSetter, GlobalSeed):
 
     ######################### AR(1) CIF #########################
 
-    def _compute_ar1_cif_S(self):
+    def _compute_ar1_cif_S_old(self):
         """Calculate the theoretical power spectrum for an AR(1) process."""
 
         omega = (2 * np.pi * self.params["frequencies"]) / (self.params["fs"])
@@ -281,7 +282,7 @@ class ConditionalIntensityFunction(ParamSetter, GlobalSeed):
 
         return spectrum
 
-    def _compute_ar1_time(self, n_points, n_sims, c):
+    def _compute_ar1_time_old(self, n_points, n_sims, c):
         time_series_array = np.zeros((n_sims, n_points))
         for sim in range(n_sims):
             white_noise = np.random.normal(
@@ -297,7 +298,7 @@ class ConditionalIntensityFunction(ParamSetter, GlobalSeed):
             time_series_array[time_series_array < 0] = 0
         return time_series_array
 
-    def _simulate_ar1(self):
+    def _simulate_ar1_old(self):
         """Simulate homogenous Poisson process."""
 
         sampling_frequency = 1 / (1 / self.params["fs"])
@@ -315,3 +316,49 @@ class ConditionalIntensityFunction(ParamSetter, GlobalSeed):
 
         n_sims = self.params["Nsims"]
         return self._compute_ar1_time(n_points=len(self._time_axis), n_sims=n_sims, c=c)
+
+
+    def _compute_ar_cif_S(self):
+        """Calculate the theoretical power spectrum for an AR(p) process."""
+        p = len(self.params["ar_coeffs"])
+        omega = (2 * np.pi * self.params["frequencies"]) / self.params["fs"]
+        ar_coeffs = self.params["ar_coeffs"]
+        
+        # Calculate the denominator of the power spectrum equation
+        denom = 1 - np.sum([ar_coeffs[j] * np.exp(-1j * omega * (j + 1)) for j in range(p)], axis=0)
+        
+        spectrum = (self.params["white_noise_variance"] ** 2) / (2 * np.pi * np.abs(denom) ** 2)
+        
+        Mby2 = self.params["NFFT"] // 2
+        spectrum[Mby2 + 1:] = np.flipud(spectrum[1:Mby2])
+
+        return spectrum
+
+    def _compute_ar_time(self, n_points, n_sims):
+        """Generate AR(p) time series."""
+        p = len(self.params["ar_coeffs"])
+        ar_coeffs = self.params["ar_coeffs"]
+        time_series_array = np.zeros((n_sims, n_points))
+        
+        for sim in range(n_sims):
+            white_noise = np.random.normal(0, self.params["white_noise_variance"], n_points)
+            time_series = np.zeros(n_points)
+            for t in range(p, n_points):
+                # Generate AR(p) process time series
+                time_series[t] = np.sum([ar_coeffs[j] * time_series[t - j - 1] for j in range(p)]) + white_noise[t]
+            
+            time_series_array[sim, :] = time_series
+            time_series_array += self.params["lambda_0"]
+            time_series_array[time_series_array < 0] = 0
+        
+        return time_series_array
+
+    def _simulate_ar(self):
+        """Simulate the AR(p) process and return the time series."""
+        t = np.arange(0, self.params["T"], (1 / self.params["fs"]))
+        
+        ar_cif_S = self._compute_ar_cif_S()
+        ar_cif_S[0] = 0  # Enforce zero DC component
+        
+        n_sims = self.params["Nsims"]
+        return self._compute_ar_time(n_points=len(t), n_sims=n_sims)
