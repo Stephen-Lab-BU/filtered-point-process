@@ -12,3 +12,5 @@ dependencies:
   - pip:
     - black
     - pre-commit
+    - numdifftools
+    - nitime

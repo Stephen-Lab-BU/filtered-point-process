@@ -28,3 +28,7 @@ mamba activate filtered-point-process
 python -m pip install git+https://github.com/Stephen-Lab-BU/filtered-point-process.git
 
 ```
+
+#### Major upcoming changes
+
+The package is being refactored to have a set of tutorials and be built on a multivariate version of this package. Currently, the package is set up to do univariate models. The full multivariate build with tutorials will be released as a complete build on November 27th. 

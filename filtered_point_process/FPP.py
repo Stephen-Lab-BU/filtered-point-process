@@ -1,14 +1,14 @@
 from .filters import Filter
 import numpy as np
 
-
 class FilteredPointProcess(Filter):
     """Class to interact with the filtered point process."""
 
-    def __init__(self, filters=None, model=None):
-        super().__init__(filters=filters, model=model)
+    def __init__(self, filters=None, model=None, filter_params=None):
+        super().__init__(filters=filters, model=model, filter_params=filter_params)
         self.filter_names = list(filters.keys())
         self.filter_labels = list(filters.values())
+        self.filter_params = filter_params if filter_params is not None else {}
 
     def get_filters(self):
         outputs = {}
@@ -20,6 +20,7 @@ class FilteredPointProcess(Filter):
                 "kernel": filter_instance.kernel,
                 "power_spectrum": filter_instance.kernel_spectrum,
                 "frequencies": filter_instance.frequencies,
+                "kernel_density_not_squared": filter_instance.kernel_density_not_squared,
             }
         return outputs
 
