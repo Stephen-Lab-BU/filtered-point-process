@@ -43,7 +43,7 @@ class PointProcess(ConditionalIntensityFunction, ParamSetter, GlobalSeed):
 
     def _set_process_type(self):
         method = self.pp_params["method"].lower()
-        if method in ["ar(1)", "ar1", "gaussian"]:
+        if method in ["ar(p)", "arp", "gaussian", "gamma"]:
             self._process_type = "cox"
         elif method == "homogeneous_poisson":
             self._process_type = "homog_pois"
