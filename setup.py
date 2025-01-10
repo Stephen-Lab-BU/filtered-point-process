@@ -8,7 +8,7 @@ setup(
     author="Patrick F. Bloniasz",
     author_email="patrick.bloniasz@gmail.com",
     description="A Python package for modeling and analyzing filtered point processes capturing electrophysiological field potentials.",
-    long_description=open("README.md").read(),
+    long_description=open("README.rst").read(),
     long_description_content_type="text/markdown",
     packages=find_packages(),
     include_package_data=True,
