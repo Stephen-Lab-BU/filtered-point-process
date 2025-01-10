@@ -27,14 +27,9 @@ jobs:
       - name: Create environment from environment.yml
         run: mamba env create -f environment.yml
 
-        
-      - name: Activate environment & install from GitHub
+      - name: Install package from GitHub
         run: |
-          conda activate filtered-point-process
-          
-          python -m pip install git+https://github.com/Stephen-Lab-BU/filtered-point-process.git
-
-          # Check that it installed by attempting an import
-          python -c "import filtered_point_process"
-
-          echo "Success! The package installed and can be imported."
+          conda run -n filtered-point-process python -m pip install git+https://github.com/Stephen-Lab-BU/filtered-point-process.git
+          # Verify import works
+          conda run -n filtered-point-process python -c "import filtered_point_process"
+          echo "Success: The package installed and can be imported."
