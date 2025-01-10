@@ -1,6 +1,6 @@
 # filtered-point-process
 
-Beta package associated with the paper "Filtered Point Processes Tractably Capture Rhythmic And Broadband Power Spectral Structure in Field-based Neural Recordings" (2024)
+Beta package associated with the paper "Filtered Point Processes Tractably Capture Rhythmic And Broadband Power Spectral Structure in Field-based Neural Recordings" (2025)
 
 Patrick F. Bloniasz, Shohei Oyama, Emily P Stephen
 
@@ -8,7 +8,7 @@ Patrick F. Bloniasz, Shohei Oyama, Emily P Stephen
 
 ### 1. Install required packages
 
-While the pacakge is in beta we recommend engaging with the package in the following way:
+While the pacakge is in development, we recommend downloading with the package in the following way:
 
 #### Install Mamba through Conda
 
