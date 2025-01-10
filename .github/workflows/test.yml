@@ -14,25 +14,27 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Miniconda
-        # This action sets up a Miniconda installation so we can run conda/mamba commands.
         uses: conda-incubator/setup-miniconda@v2
         with:
-          activate-environment: base
+          python-version: "3.10"
           channels: conda-forge
-          python-version: 3.9
-          auto-update-conda: true
-          use-mamba: false
+          auto-update-conda: false
+          auto-activate-base: false
 
-      - name: Install Mamba and create environment
-        run: |
-          conda install mamba -n base -c conda-forge
-          mamba env create -f environment.yml 
+      - name: Install Mamba into base
+        run: conda install -n base -c conda-forge mamba
 
-      - name: Activate environment and install package from GitHub
+      - name: Create environment from environment.yml
+        run: mamba env create -f environment.yml
+
+        
+      - name: Activate environment & install from GitHub
         run: |
           conda activate filtered-point-process
-          # Now run the final step from your instructions:
+          
           python -m pip install git+https://github.com/Stephen-Lab-BU/filtered-point-process.git
-          # Verify it installed and can be imported:
+
+          # Check that it installed by attempting an import
           python -c "import filtered_point_process"
-          echo "Success! The package was installed and can be imported."
+
+          echo "Success! The package installed and can be imported."
