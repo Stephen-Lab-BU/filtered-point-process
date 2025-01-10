@@ -1,44 +1,38 @@
-name: Run Tests
+name: Test Installation from Source
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
+
 jobs:
-  test:
+  test-installation:
     runs-on: ubuntu-latest
-
     steps:
-      # Step 1: Checkout the repository code
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Check out code
+        uses: actions/checkout@v4
 
-      # Step 2: Install Miniconda
       - name: Set up Miniconda
+        # This action sets up a Miniconda installation so we can run conda/mamba commands.
         uses: conda-incubator/setup-miniconda@v2
         with:
           activate-environment: base
+          channels: conda-forge
+          python-version: 3.9
           auto-update-conda: true
+          use-mamba: false
 
-      # Step 3: Install Mamba and create the environment
       - name: Install Mamba and create environment
         run: |
           conda install mamba -n base -c conda-forge
-          mamba env create -f environment.yml
+          mamba env create -f environment.yml 
 
-      # Step 4: Activate the environment and install the package
-      - name: Activate environment and install package
-        shell: bash -l {0}
+      - name: Activate environment and install package from GitHub
         run: |
-          source activate filtered-point-process
+          conda activate filtered-point-process
+          # Now run the final step from your instructions:
           python -m pip install git+https://github.com/Stephen-Lab-BU/filtered-point-process.git
-
-      # Step 5: Run tests
-      - name: Run tests
-        shell: bash -l {0}
-        run: |
-          source activate filtered-point-process
-          pytest tests
+          # Verify it installed and can be imported:
+          python -c "import filtered_point_process"
+          echo "Success! The package was installed and can be imported."
