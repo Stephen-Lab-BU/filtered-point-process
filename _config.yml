@@ -1,0 +1,23 @@
+title: filtered-point-process
+description: A Python package for modeling and analyzing filtered point processes capturing electrophysiological field potentials.
+
+theme: just-the-docs
+
+# Configure navigation
+nav:
+  - title: Home
+    url: /
+  - title: Explanations
+    url: /Explanations/
+  - title: Examples
+    url: /Examples_pp/
+  - title: Static Files
+    url: /static/
+  - title: Features and Improvements
+    url: /Features_and_improvements/
+  - title: Tests
+    url: /tests/
+
+search_enabled: true
+
+
