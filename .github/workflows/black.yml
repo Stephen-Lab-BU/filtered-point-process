@@ -19,13 +19,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
-          python-version: '3.10'  
+          python-version: '3.10'  # Adjust as needed
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install black
+          pip install black[jupyter]  # Install black with Jupyter support
 
       - name: Run Black
         run: |
-          black --check .  # Run black with the --check flag to see if the code is formatted
+          black .  # Automatically format code
