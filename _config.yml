@@ -9,14 +9,6 @@ nav:
     url: /
   - title: Explanations
     url: /Explanations/
-  - title: Examples
-    url: /Examples_pp/
-  - title: Static Files
-    url: /static/
-  - title: Features and Improvements
-    url: /Features_and_improvements/
-  - title: Tests
-    url: /tests/
 
 search_enabled: true
 
