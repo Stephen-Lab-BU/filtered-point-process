@@ -12,8 +12,5 @@ This package provides tools for modeling and analyzing filtered point processes,
 ## Sections
 
 - [Explanations](./Explanations/)
-- [Static Files](./static/)
-- [Features and Improvements](./Features_and_improvements/)
-- [Tests](./tests/)
 
-Learn how to [install the package](./README/) and get started with [examples](./Examples_pp/).
+Learn how to [install the package](./README.rst/) and get started with [examples](./Examples_pp/).
