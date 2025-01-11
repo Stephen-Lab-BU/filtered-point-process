@@ -1,0 +1,19 @@
+name: filtered-point-process
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - numpy
+  - matplotlib
+  - ipykernel
+  - statsmodels
+  - scipy
+  - pip
+  - pytest
+  - pip:
+    - black
+    - "black[jupyter]"
+    - pre-commit
+    - numdifftools
+    - nitime
+    - spectral_connectivity

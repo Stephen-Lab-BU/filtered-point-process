@@ -1,0 +1,37 @@
+{"0": {
+    "doc": "Explanations",
+    "title": "Explanations",
+    "content": "Over time, we will populate explanations here. ",
+    "url": "/Explanations/",
+    
+    "relUrl": "/Explanations/"
+  },"1": {
+    "doc": "Explanations",
+    "title": "Topics",
+    "content": ". | Impact of Discrete vs Continuous Convolution | . ",
+    "url": "/Explanations/#topics",
+    
+    "relUrl": "/Explanations/#topics"
+  },"2": {
+    "doc": "Home",
+    "title": "Filtered Point Process",
+    "content": "Welcome to the documentation for the Filtered Point Process package! . This package provides tools for modeling and analyzing filtered point processes, capturing electrophysiological field potentials. ",
+    "url": "/#filtered-point-process",
+    
+    "relUrl": "/#filtered-point-process"
+  },"3": {
+    "doc": "Home",
+    "title": "Sections",
+    "content": ". | Explanations | Static Files | Features and Improvements | Tests | . Learn how to install the package and get started with examples. ",
+    "url": "/#sections",
+    
+    "relUrl": "/#sections"
+  },"4": {
+    "doc": "Home",
+    "title": "Home",
+    "content": " ",
+    "url": "/",
+    
+    "relUrl": "/"
+  }
+}

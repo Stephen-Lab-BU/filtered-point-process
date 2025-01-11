@@ -3,6 +3,8 @@ description: A Python package for modeling and analyzing filtered point processe
 
 theme: just-the-docs
 
+url: https://stephen-lab-bu.github.io/filtered-point-process/
+
 # Configure navigation
 nav:
   - title: Home
