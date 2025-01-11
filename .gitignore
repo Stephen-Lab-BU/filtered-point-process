@@ -24,3 +24,5 @@ filtered_point_process/__pycache__/ParamSetter.cpython-37.pyc
 filtered_point_process/__pycache__/PointProcess.cpython-37.pyc
 filtered_point_process/__pycache__/pp.cpython-37.pyc
 filtered_point_process/__pycache__/utils.cpython-37.pyc
+filtered-point-process/local_workflow.ipynb
+local_workflow.ipynb
