@@ -1,13 +1,7 @@
-source "https://rubygems.org"
+source 'https://rubygems.org'
 
-# GitHub Pages plugin
-gem "github-pages", group: :jekyll_plugins
+gem "jekyll", "~> 4.3.4" # installed by `gem jekyll`
+# gem "webrick"        # required when using Ruby >= 3 and Jekyll <= 4.2.2
 
-# Just the Docs theme
-gem "just-the-docs", group: :jekyll_plugins
-
-# Additional Jekyll plugins
-gem "jekyll-github-metadata", ">= 2.15", group: :jekyll_plugins
-gem "jekyll-include-cache", group: :jekyll_plugins
-gem "jekyll-sitemap", group: :jekyll_plugins
-
+gem "just-the-docs", "0.10.1" # pinned to the current release
+# gem "just-the-docs"        # always download the latest release
