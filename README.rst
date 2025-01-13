@@ -109,18 +109,24 @@ Point process modeling (e.g., Cox process with spectrally-defined Conditional In
        "simulate": True,
        "seed": 1,    # For reproducibility
    }
-   
+
+   # ----------------------------------------------------------------------
    # 3) Create and simulate the model
+   # ----------------------------------------------------------------------
    model = Model(model_name, model_params, simulation_params)
    spikes = model.spikes
    
+   # ----------------------------------------------------------------------
    # 4) Access CIF outputs
+   # ----------------------------------------------------------------------
    time_axis = model.cif.cif_time_axis
    intensity = model.cif.cif_realization.squeeze()
    freqs_cif = model.cif.frequencies
    psd_cif = model.cif.PSD
-   
+
+   # ----------------------------------------------------------------------
    # 5) Compute point-process spectrum 
+   # ----------------------------------------------------------------------
    pp_psd = model.pp.frequency_domain.get_PSD()
    
    # ----------------------------------------------------------------------
