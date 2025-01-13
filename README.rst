@@ -124,7 +124,7 @@ Point process modeling (e.g., Cox process with spectrally-defined Conditional In
    pp_psd = model.pp.frequency_domain.get_PSD()
    
    # ----------------------------------------------------------------------
-   # 6) Single Figure, 2 x 2 subplots
+   # 6) Figure
    # ----------------------------------------------------------------------
    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
    
@@ -295,7 +295,7 @@ Forward modeling of Field Potentials (e.g., LFP/ECoG) and (beta) Parameter Estim
    glm_predicted_psd = S_psp_interpolated * lambda_0_estimated
    
    # ----------------------------------------------------------------------
-   # 8) Single Figure with 2 Subplots
+   # 8) Figure
    # ----------------------------------------------------------------------
    fig, axes = plt.subplots(1, 2, figsize=(15, 5))
    
