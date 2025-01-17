@@ -2,6 +2,7 @@ name: filtered-point-process
 channels:
   - conda-forge
 dependencies:
+  - python=3.10
   - numpy
   - matplotlib
   - ipykernel
