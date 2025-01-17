@@ -42,7 +42,7 @@ class AMPAFilter(FilterBase):
         T = self.pp.cif.T
         freqs = self.frequencies
 
-        self.filter_params["filter_time_vector"] = np.linspace(0, T, int(fs * T))
+        self.filter_params["filter_time_vector"] = np.linspace(0, 1, int(fs *1))
 
         tau_rise = self.filter_params["tau_rise"]
         tau_decay = self.filter_params["tau_decay"]
@@ -99,7 +99,7 @@ class GABAFilter(FilterBase):
         T = self.pp.cif.T
         freqs = self.frequencies
 
-        self.filter_params["filter_time_vector"] = np.linspace(0, T, int(fs * T))
+        self.filter_params["filter_time_vector"] = np.linspace(0, 1, int(fs * 1))
 
         tau_rise = self.filter_params["tau_rise"]
         tau_decay = self.filter_params["tau_decay"]

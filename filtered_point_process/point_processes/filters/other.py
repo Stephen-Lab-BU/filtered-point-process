@@ -28,7 +28,7 @@ class LeakyIntegratorFilter(FilterBase):
         fs = self.pp.cif.fs
         T = self.pp.cif.T
         self.filter_params.setdefault("A", 1.0 / 0.1)
-        self.filter_params.setdefault("filter_time_vector", np.linspace(0, T, int(fs * T)))
+        self.filter_params.setdefault("filter_time_vector", np.linspace(0, 1, int(fs * 1)))
 
         self.compute_filter()
 
@@ -46,6 +46,8 @@ class LeakyIntegratorFilter(FilterBase):
 
         # Time-domain
         self._kernel_t = np.exp(-A * t_vector)
+
+        self._kernel_t[0] = 0
 
         # Frequency-domain
         self._kernel_f = 1.0 / (A + 1j * 2 * np.pi * freqs)
@@ -82,7 +84,7 @@ class LorenzianFilter(FilterBase):
         fs = self.pp.cif.fs
         self.filter_params.setdefault("A", 1.0 / 0.1)
         self.filter_params.setdefault("alpha", 1.0)
-        self.filter_params.setdefault("filter_time_vector", np.arange(0, 1, 1.0 / fs))
+        self.filter_params.setdefault("filter_time_vector", np.arange(0, T, 1.0 / fs))
 
         self.compute_filter()
 

@@ -1,6 +1,8 @@
 import numpy as np
 from scipy.interpolate import interp1d
 from filtered_point_process.point_processes.filters import Filter
+from scipy.signal import fftconvolve
+# import matplotlib.pyplot as plt # for debugging only
 
 class FilteredPointProcess:
     """Class to interact with the filtered point process.
@@ -92,7 +94,7 @@ class FilteredPointProcess:
     def continuous_convolution(self, spike_times, kernel, kernel_time, out_time):
         """
         Convolve spike times with a kernel in a continuous manner.
-        For each spike time, we shift 'kernel' and add via interpolation.
+        For each spike time, we shift the kernel.
         """
         k_interp = interp1d(
             kernel_time, kernel, kind="cubic", bounds_error=False, fill_value=0.0
@@ -101,62 +103,24 @@ class FilteredPointProcess:
         for s in spike_times:
             out += k_interp(out_time - s)
         return out
-
-
-    def _combine_two_filters_continuous(self, filter1_name, filter2_name):
-        """
-        Combine exactly two filters by convolving them (shift-and-sum)
-        on the *same dt* as filter1, returning a single combined kernel
-        and a matching time axis. This helps avoid leakage from time-axis
-        mismatches.
-
-        The math is approximating:
-            (k1 * k2)(t) = ∫ k1(τ) k2(t - τ) dτ
-        in a discrete Riemann-sum form, so we multiply by 'dt' at the end.
-        """
-        import numpy as np
-        from scipy.interpolate import interp1d
-
-        # Get the two filters
-        f1 = self.filter_instances[filter1_name]
-        f2 = self.filter_instances[filter2_name]
-        t1, k1 = f1.kernel_time_axis, f1.kernel
-        t2, k2 = f2.kernel_time_axis, f2.kernel
-
-        # Use filter1's sampling interval as the "base" dt
-        dt = t1[1] - t1[0]
-        # Maximum time of the combined kernel is roughly t1[-1] + t2[-1]
-        max_time = t1[-1] + t2[-1]
-
-        # Build a unified time axis with the same dt
-        combined_time = np.arange(0, max_time + dt/2, dt)
-
-        # We'll interpolate filter2 onto that same axis when shifting
-        k2_interp = interp1d(t2, k2, kind='linear', bounds_error=False, fill_value=0.0)
-
-        # Shift-and-sum approximation of the convolution integral
-        out = np.zeros_like(combined_time)
-        for i, tau_val in enumerate(t1):
-            amp = k1[i]
-            # Evaluate k2 at (combined_time - tau_val)
-            out += amp * k2_interp(combined_time - tau_val)
-
-        # Multiply by dt to approximate the ∫ in continuous time
-        out *= dt
-
-        return out, combined_time
-
-
+    
     def apply_filter_sequences(self, filter_sequences):
         """
         Applies a specified sequence of filters to each process in both frequency
         and time domains. For each sequence:
-            - If there's 1 filter, use it directly.
-            - If there are 2 filters, combine them into one via continuous convolution.
-            - Otherwise, raise an error (no assumptions beyond 1 or 2 filters).
+            - If there's 1 filter, use it directly via continuous convolution.
+            - If there are 2 filters:
+                Convolve the two kernels together discretely and correct by fs. Then,
+                treating the filters as a single filter, do the continuous convolution.
+            - Otherwise, raise an error (only handles sequences of length 1 or 2).
 
-        Then convolve the final single kernel with the spike times in a continuous manner.
+        Then, aggregate the filtered time series and spectra across all sequences and processes.
+
+        Args:
+            filter_sequences (list of lists):
+                A list where each sublist represents a sequence of filter names to apply.
         """
+        # Ensure filter_sequences is a list of lists
         if self.num_processes == 1 and not isinstance(filter_sequences[0], list):
             filter_sequences = [filter_sequences]
 
@@ -165,52 +129,79 @@ class FilteredPointProcess:
 
         for i, seq in enumerate(filter_sequences):
             if len(seq) == 1:
-                # Single filter
+                print(f"Running the single filter {filter_sequences}")
+                # Single filter case
                 f_name = seq[0]
+                print(f"Running the single filter {f_name}")
                 f_inst = self.filter_instances[f_name]
                 combined_kernel = f_inst.kernel
                 combined_kernel_time = f_inst.kernel_time_axis
                 total_filter_spectrum = f_inst.kernel_spectrum
 
-            elif len(seq) == 2:
-                # Two filters -> combine once
-                f1, f2 = seq[0], seq[1]
-                combined_kernel, combined_kernel_time = self._combine_two_filters_continuous(f1, f2)
-                # Multiply their spectra
-                total_filter_spectrum = (
-                    self.filter_instances[f1].kernel_spectrum
-                    * self.filter_instances[f2].kernel_spectrum
+                # Convolve spike times with the single filter via continuous convolution
+                if self.num_processes > 1:
+                    spike_times = self.model.spikes[0][i]
+                else:
+                    spike_times = self.model.spikes
+
+                filtered_train = self.continuous_convolution(
+                    spike_times, combined_kernel, combined_kernel_time, self.time_axis
                 )
+
+            elif len(seq) == 2:
+                print(f"Running the two filters")
+                # Two filters case
+                f1_name, f2_name = seq[0], seq[1]
+                f1 = self.filter_instances[f1_name]
+                f2 = self.filter_instances[f2_name]
+
+                # Step 1: Continuous convolution with the first filter
+                if self.num_processes > 1:
+                    spike_times = self.model.spikes[0][i]
+                else:
+                    spike_times = self.model.spikes
+
+                # Scenario 2: Combine the two kernels and apply as a single kernel
+                print("Combining the two filters...")
+                dt = self.time_axis[1] - self.time_axis[0]  # Calculate dt from the time axis
+                combined_kernel = fftconvolve(f1.kernel, f2.kernel, mode='full')
+                combined_kernel *= dt  # Normalize by dt
+
+                # Generate the time axis for the combined kernel
+                combined_kernel_time_axis = np.linspace(
+                    f1.kernel_time_axis[0] + f2.kernel_time_axis[0],
+                    f1.kernel_time_axis[-1] + f2.kernel_time_axis[-1],
+                    len(combined_kernel),
+                )
+
+
+                filtered_train = self.continuous_convolution(
+                    spike_times, combined_kernel, combined_kernel_time_axis, self.time_axis
+                )
+
+                total_filter_spectrum = f1.kernel_spectrum * f2.kernel_spectrum 
+
             else:
                 raise ValueError(
                     "apply_filter_sequences only handles sequences of length 1 or 2. "
                     f"Got {len(seq)} filters in {seq}."
                 )
 
-            # Convolve final kernel with spike times
-            if self.num_processes > 1:
-                spike_times = self.model.spikes[0][i]
-            else:
-                spike_times = self.model.spikes
-
-            filtered_train = self.continuous_convolution(
-                spike_times, combined_kernel, combined_kernel_time, self.time_axis
-            )
-
             # Frequency-domain result
-            lambda_only_filtered = (
-                self.decompositions[i]["lambda_only"] * total_filter_spectrum
-            )
+            lambda_only_filtered = self.decompositions[i]["lambda_only"] * total_filter_spectrum
             cif_filtered = self.decompositions[i]["cif"] * total_filter_spectrum
 
             new_time_series.append(filtered_train)
             new_spectra.append(lambda_only_filtered + cif_filtered)
 
+        # Aggregate results across all sequences and processes
         self.final_time_series_per_process = np.array(new_time_series)
         self.final_spectrum_per_process = np.array(new_spectra)
 
         self.final_time_series = np.sum(self.final_time_series_per_process, axis=0)
         self.final_spectrum = np.sum(self.final_spectrum_per_process, axis=0)
+    
+
 
     def get_final_spectrum(self, decomposition=True):
         """
