@@ -1,3 +1,5 @@
+#__init__.py
+
 from .manager import Filter
 from .base import FilterBase
 from .post_synaptic import AMPAFilter, GABAFilter

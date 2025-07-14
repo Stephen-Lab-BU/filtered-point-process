@@ -1,3 +1,5 @@
+#post_synaptic.py
+
 import numpy as np
 from .base import FilterBase
 
@@ -39,17 +41,20 @@ class AMPAFilter(FilterBase):
         frequency-domain kernel (`self._kernel_f`) and the power spectrum (`self._kernel_spectrum`).
         """
         fs = self.pp.cif.fs
-        T = self.pp.cif.T
+
         freqs = self.frequencies
-
-        self.filter_params["filter_time_vector"] = np.linspace(0, 1, int(fs *1))
-
+            
         tau_rise = self.filter_params["tau_rise"]
         tau_decay = self.filter_params["tau_decay"]
 
-        self._kernel_t = np.exp(
-            -self.filter_params["filter_time_vector"] / tau_decay
-        ) - np.exp(-self.filter_params["filter_time_vector"] / tau_rise)
+        if self.pp.cif.simulate:
+            T = self.pp.cif.T
+            self.filter_params["filter_time_vector"] = np.linspace(0, 1, int(fs *1))
+
+    
+            self._kernel_t = np.exp(
+                -self.filter_params["filter_time_vector"] / tau_decay
+            ) - np.exp(-self.filter_params["filter_time_vector"] / tau_rise)
 
         self._kernel_f = 1.0 / (1.0 / tau_decay + 1j * 2 * np.pi * freqs) - 1.0 / (
             1.0 / tau_rise + 1j * 2 * np.pi * freqs
@@ -96,18 +101,21 @@ class GABAFilter(FilterBase):
         frequency-domain kernel (`self._kernel_f`) and the power spectrum (`self._kernel_spectrum`).
         """
         fs = self.pp.cif.fs
-        T = self.pp.cif.T
         freqs = self.frequencies
 
-        self.filter_params["filter_time_vector"] = np.linspace(0, 1, int(fs * 1))
+        
 
         tau_rise = self.filter_params["tau_rise"]
         tau_decay = self.filter_params["tau_decay"]
 
-        # Time-domain
-        self._kernel_t = np.exp(
-            -self.filter_params["filter_time_vector"] / tau_decay
-        ) - np.exp(-self.filter_params["filter_time_vector"] / tau_rise)
+        if self.pp.cif.simulate:
+
+            self.filter_params["filter_time_vector"] = np.linspace(0, 1, int(fs * 1))
+            T = self.pp.cif.T
+            # Time-domain
+            self._kernel_t = np.exp(
+                -self.filter_params["filter_time_vector"] / tau_decay
+            ) - np.exp(-self.filter_params["filter_time_vector"] / tau_rise)
 
         # Frequency-domain
         self._kernel_f = 1.0 / (1.0 / tau_decay + 1j * 2 * np.pi * freqs) - 1.0 / (

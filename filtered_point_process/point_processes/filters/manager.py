@@ -1,8 +1,10 @@
+#manager.py
+
 class Filter:
     """
     Factory and manager for initializing and managing filter instances.
 
-    This class handles the creation of various filter types based on provided configurations.
+    This class handles the creation of package filter types based on provided configurations.
     It validates the filter types, initializes the corresponding filter subclasses, and manages
     the collection of filter instances associated with a given model or point process.
     """
@@ -31,17 +33,22 @@ class Filter:
         self.model = model
         self.filter_params = filter_params if filter_params else {}
 
+        # Validate the user-supplied filter types
         self._validate_filters(filters)
 
         if model is None:
             raise ValueError(
                 "Model cannot be None; pass a valid point process or model."
             )
+        self.pp = getattr(model, "pp", model) # getter for the point process
 
-        self.pp = model  # The point process or model.pp
-
+        # Dictionary that records the filter_type for each filter name
+        # TO DO: Refactor this code 
+        self.filter_types = {}
         self.filter_instances = {}
+
         for filter_name, filter_type in filters.items():
+            self.filter_types[filter_name] = filter_type
             fparams = self.filter_params.get(filter_name, {})
             inst = self.initialize_filter(filter_type, self.pp, fparams)
             self.filter_instances[filter_name] = inst
@@ -56,7 +63,6 @@ class Filter:
         Raises:
             ValueError: If any filter type is not among the valid filter types.
         """
-
         for ftype in filters.values():
             if ftype not in self.VALID_FILTER_TYPES:
                 raise ValueError(

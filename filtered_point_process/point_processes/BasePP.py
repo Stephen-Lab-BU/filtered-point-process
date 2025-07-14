@@ -1,5 +1,10 @@
+#BasePP.py
 from abc import ABC, abstractmethod
 import numpy as np
+from filtered_point_process.domains.frequency_domain import (
+    create_frequency_domain,
+    FrequencyDomain,
+)
 
 
 class BasePointProcess(ABC):
@@ -18,6 +23,18 @@ class BasePointProcess(ABC):
         self._set_process_type()
         self.time_domain = None
         self.frequency_domain = None
+
+        if hasattr(self.cif, "cif_frequencies"):
+            freqs = self.cif.cif_frequencies
+        else:
+            freqs = self.cif.get_frequencies()
+ 
+        # 2) compute the “baseline” spectrum (λ₀ + CIF‐PSD)
+        pp_psd = self._compute_spectrum()
+ 
+        # 3) wrap it in your FrequencyDomain
+        self.frequency_domain = create_frequency_domain(freqs, pp_psd)
+        
 
     @abstractmethod
     def _set_process_type(self):

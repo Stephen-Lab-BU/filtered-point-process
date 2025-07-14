@@ -1,3 +1,5 @@
+#model.py
+
 from filtered_point_process.cif.Spectral_Gaussian import GaussianCIF
 from filtered_point_process.cif.HomogeneousPoisson import HomogeneousPoissonCIF
 from filtered_point_process.cif.AR import ARCIF
@@ -28,6 +30,8 @@ class Model:
         self.spikes = None
 
         self._create_cif()
+        
+        self.pp = PointProcess(self.cif)
 
         if self.simulation_params.get("simulate", False) is True:
             self._simulate_process()
@@ -63,7 +67,6 @@ class Model:
         This method generates spike events by simulating the point process using the associated CIF.
         The simulation results are stored within the model instance.
         """
-        self.pp = PointProcess(self.cif)
         self.spikes = self.pp.simulate()
 
     @property

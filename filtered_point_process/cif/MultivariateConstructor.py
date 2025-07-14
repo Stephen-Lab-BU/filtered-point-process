@@ -1,3 +1,4 @@
+
 import numpy as np
 import warnings
 from filtered_point_process.cif.Spectral_Gaussian import GaussianCIF
@@ -9,50 +10,19 @@ from scipy.fftpack import ifft
 
 class MultivariateCIF:
     """
-    Initialize the MultivariateCIF instance.
+    Multivariate Conditional-Intensity-Function container that supports both
+    purely frequency-domain analysis and full time-domain simulation.
 
-    Parameters
-    ----------
-    num_processes : int
-        Number of subprocesses.
-    cif_types : list of str
-        List specifying the CIF type for each subprocess. Supported types include
-        "Gaussian", "HomogeneousPoisson", and "AR".
-    cif_params : list of dict
-        List of parameter dictionaries corresponding to each CIF type. Each dictionary
-        should contain the necessary parameters for initializing the respective CIF.
-    fs : float
-        Sampling frequency in Hertz (Hz).
-    NFFT : int, optional
-        Number of points to determine the frequency
-        resolution. If not provided, a default value is used based on `fs`.
-    seed : int, optional
-        Seed for the random number generator to ensure reproducibility. If None, the
-        random number generator is not seeded.
-    simulate : bool, optional (default=False)
-        Flag indicating whether to perform time-domain simulations upon initialization.
-    T : float, optional
-        Total simulation time in seconds. Must be specified if `simulate` is set to True.
-    Nsims : int, optional (default=1)
-        Number of independent simulations to generate if `simulate` is True.
-    dependence : str, optional (default="independent")
-        Type of dependence between subprocesses. Must be either "independent" or "dependent".
-        - "independent": Subprocesses operate independently.
-        - "dependent": Subprocesses are linearly dependent based on provided weights.
-    weights : list or np.ndarray, optional
-        Weights for linear transformation in dependent Gaussian processes. Required if
-        `dependence` is set to "dependent". Each weight corresponds to a subprocess and
-        defines its contribution to the shared underlying Gaussian process.
+    If ``simulate=False`` (the default) we build:
+      • individual CIF objects (all with simulate=False)  
+      • per-process PSDs (`self.spectra`)  
+      • full cross-spectral matrix (`self.cross_spectra`)  
+      • a `FrequencyDomain` wrapper (`self.frequency_domain`)
 
-    Raises
-    ------
-    ValueError
-        - If an unsupported CIF type is provided in `cif_types`.
-        - If `dependence` is set to "dependent" but `weights` are not provided or their
-            length does not match `num_processes`.
-        - If `simulate` is True but `T` is not provided.
-    NotImplementedError
-        - If a CIF type that is not yet implemented (e.g., "AR") is specified.
+    When ``simulate=True`` we additionally:
+      • require a total time `T`  
+      • generate `self.time_series` (shape PxNxNsims)  
+      • create a `TimeDomain` wrapper (`self.time_domain`)
     """
 
     def __init__(
@@ -75,296 +45,334 @@ class MultivariateCIF:
         self.fs = fs
         self.NFFT = NFFT
         self.seed = seed
-        self.simulate = simulate
+        self.simulate = bool(simulate)
         self.T = T
-        self.N = int(self.T * self.fs)
         self.Nsims = Nsims
+        if Nsims is None:
+            self.Nsims = 1
         self.dependence = dependence
-        self.weights = weights
         self.random_state = np.random.RandomState(seed)
+        self.num_bumps = None   # will be filled once CIFs are built
+        self.weights   = None
 
-        # Initialize individual CIFs
+        # Guard: time-domain quantities only if simulate=True
+        if self.simulate:
+            if self.T is None:
+                raise ValueError("Total time T must be provided when simulate=True.")
+            self.N = int(self.T * self.fs)
+        else:
+            self.N = None  # purely frequency-domain mode
+
+        # ---------------- build individual CIFs ------------------------ #
         self.cifs = []
         for i in range(num_processes):
             cif_type = cif_types[i]
             params = cif_params[i]
+
             if cif_type == "Gaussian":
                 cif = GaussianCIF(fs=fs, NFFT=NFFT, seed=seed, simulate=False, **params)
+
             elif cif_type == "HomogeneousPoisson":
                 if dependence != "independent":
-                    raise ValueError(
-                        "Homogeneous Poisson CIFs can only be independent."
-                    )
+                    raise ValueError("Homogeneous Poisson CIFs can only be independent.")
                 cif = HomogeneousPoissonCIF(
                     fs=fs, NFFT=NFFT, seed=seed, simulate=False, **params
                 )
+                # Mark that this multivariate container is Poisson
                 self._cif_type_label = "HomogeneousPoisson"
+
             elif cif_type == "AR":
                 raise NotImplementedError("Multivariate AR CIF is not implemented yet.")
+
             else:
                 raise ValueError(f"Unknown or unsupported CIF type: {cif_type}")
+
             self.cifs.append(cif)
 
-        # Check for parameter consistency if dependent
+        # Parameter-consistency check for dependent Gaussian case
         if dependence == "dependent":
             self._check_cif_parameters_consistency()
 
-        # Use the frequencies from the first CIF
+        self.num_bumps = len(self.cifs[0].compute_bump_spectra())
+        if weights is None:
+            weights = np.ones(self.num_processes)
+        self._stash_weights(weights)
+
+        # Shared frequency axis
         self.frequencies = self.cifs[0].cif_frequencies
 
-        # Compute the spectra for each subprocess
-        self._compute_spectra()
-
-        # Set the cif_PSD attribute
-        self.cif_PSD = self.spectra
-
-        # Create the frequency domain object
+        # ---------------- frequency-domain objects --------------------- #
+        self._compute_spectra()         
+        self._compute_cross_spectra()   
+        self.cif_PSD = self.spectra     # Rename (TO DO: don't do this)
         self.frequency_domain = create_frequency_domain(self.frequencies, self.cif_PSD)
 
-        # If dependent and Gaussian, compute cross-spectra
-        if dependence == "dependent":
-            for cif_type in cif_types:
-                if cif_type != "Gaussian":
-                    raise ValueError(
-                        "Dependent processes are only supported for Gaussian CIFs."
-                    )
-            self._compute_cross_spectra_gaussian()
-
-        # Simulate if required
-        if simulate:
-            if T is None:
-                raise ValueError("Total time T must be provided for simulation.")
+        if self.simulate:
             self._simulate_time_domain_multi()
 
-            # Set the cif_realization attribute
-            self.cif_realization = self.time_series
-
-            # Create the time domain object
             self.time_domain = create_time_domain(
-                self.time_axis, intensity_realization=self.cif_realization
+                self.time_axis, intensity_realization=self.time_series
             )
+
+    # ─────────────────────────────────────────────────────────────
+    def _stash_weights(self, w):
+        """Store weights as an nd-array of shape (P,Q)."""
+        w = np.asarray(w, dtype=complex)
+        if w.ndim == 1:                       # legacy shape (P,)
+            self.weights = w[:, None]         # broadcast to (P,1) for now
+        elif w.ndim == 2:
+            if w.shape[0] != self.num_processes:
+                raise ValueError("weights.shape[0] must equal num_processes.")
+            self.weights = w
+        else:
+            raise ValueError("weights must be 1-D or 2-D.")
 
     def _compute_spectra(self):
         """
-        Compute the power spectral densities (PSDs) for each subprocess.
-
-        This method iterates through each CIF instance in `self.cifs` and retrieves
-        their respective PSDs. The computed PSDs are stored in the `self.spectra` list.
-
-        Raises
-        ------
-        AttributeError
-            If any CIF instance does not have a `cif_PSD` attribute.
+        Build per-process auto-spectra + total field spectrum
+        when dependence == 'dependent' **with bump-specific weights**.
         """
-        self.spectra = []
-        for cif in self.cifs:
-            self.spectra.append(cif.cif_PSD)
+        if self.dependence == "independent":
+            # unchanged
+            self.spectra       = [cif.cif_PSD for cif in self.cifs]
+            self.field_spectrum = np.sum(self.spectra, axis=0)
+            return
 
-    def _compute_cross_spectra_gaussian(self):
-        """
-        Compute the cross-spectral density matrices for dependent Gaussian processes.
-
-        This method calculates the cross-spectra between all pairs of Gaussian CIFs
-        based on the provided weights. The resulting cross-spectra are stored in
-        `self.cross_spectra` as a 3D NumPy array with shape (num_processes, num_processes, num_frequencies).
-
-        Raises
-        ------
-        ValueError
-            - If `weights` are not provided when `dependence` is set to "dependent".
-            - If the length of `weights` does not match `num_processes`.
-        """
-
+        # -------------- DEPENDENT CASE --------------
+        bump_PSDs = self.cifs[0].compute_bump_spectra()   # list length Q
+        Q          = len(bump_PSDs)
         if self.weights is None:
-            raise ValueError("Weights must be provided for dependent Gaussian CIFs.")
+            raise ValueError("Weights must be provided for dependent processes.")
 
-        weights = np.array(self.weights, dtype=complex)
-        if weights.shape[0] != self.num_processes:
-            raise ValueError("Weights array must have length equal to num_processes.")
+        # ensure weights have shape (P,Q)
+        if self.weights.ndim == 1:                  # (P,)  → broadcast
+            self.weights = np.repeat(self.weights[:, None], Q, axis=1)
+        elif self.weights.shape[1] != Q:
+            raise ValueError(
+                f"weights.shape[1] (={self.weights.shape[1]}) must equal num_bumps Q={Q}."
+            )
 
-        # Assuming all processes share the same frequency axis and PSD
-        frequencies = self.cifs[0].cif_frequencies
-        shared_PSD = self.cifs[0].cif_PSD
+        P = self.num_processes
+        w = self.weights                           # shape (P,Q)
 
-        # Compute the cross-spectral density matrix
-        num_freqs = len(frequencies)
-        self.cross_spectra = np.zeros(
-            (self.num_processes, self.num_processes, num_freqs), dtype=complex
-        )
+        self.spectra = []
+        for i in range(P):
+            Sii = np.zeros_like(self.frequencies, dtype=float)
+            for q in range(Q):
+                Sii += np.abs(w[i, q]) ** 2 * bump_PSDs[q]
+            self.spectra.append(Sii)
 
-        for i in range(self.num_processes):
-            for j in range(self.num_processes):
-                self.cross_spectra[i, j, :] = shared_PSD * (
-                    weights[i] * np.conj(weights[j])
-                )
+        λ0_sum = sum(cif.lambda_0 for cif in self.cifs)
+        κ = np.zeros_like(self.frequencies, dtype=float)
+        for q in range(Q):
+            κ += (np.abs(np.sum(w[:, q])) ** 2) * bump_PSDs[q]
+        self.field_spectrum = κ + λ0_sum
+
+    
+    def get_field_spectrum(self):
+        """Return the total field PSD S_field(f)."""
+        return self.field_spectrum
+
+    def get_component_spectra(self):
+        """Return the weighted per-process auto-spectra (same as self.spectra)."""
+        return self.spectra
+
+
+    def _compute_cross_spectra(self):
+        """
+        Cross-spectral matrix with bump-specific weights.
+        """
+        P, F = self.num_processes, len(self.frequencies)
+        X = np.zeros((P, P, F), dtype=complex)
+
+        if self.dependence == "independent":
+            for i in range(P):
+                X[i, i, :] = self.spectra[i]
+            self.cross_spectra = X
+            return
+
+        # ---------- dependent w/ bump weights ----------
+        bump_PSDs = self.cifs[0].compute_bump_spectra()   # list length Q
+        Q          = len(bump_PSDs)
+        w = self.weights                                  # (P,Q)
+
+        for i in range(P):
+            for j in range(P):
+                Sij = np.zeros(F, dtype=complex)
+                for q in range(Q):
+                    Sij += w[i, q] * np.conj(w[j, q]) * bump_PSDs[q]
+                X[i, j, :] = Sij
+
+        self.cross_spectra = X
+  
 
     def _simulate_time_domain_multi(self):
         """
-        Simulate the time-domain processes for all subprocesses.
-
-        Depending on the `dependence` attribute, this method handles simulations for
-        independent or dependent subprocesses.
-
-        - For "independent" dependence:
-            Each CIF is simulated independently, and the resulting time series are
-            stored in `self.time_series` with shape (num_processes, N, Nsims).
-
-        - For "dependent" dependence:
-            Generates a shared underlying Gaussian process and applies the specified
-            weights to obtain dependent subprocesses. The time series are stored in
-            `self.time_series` with shape (num_processes, N, Nsims).
-
-        After simulation, a time domain object is created containing the simulated
-        intensity realizations.
-
-        Raises
-        ------
-        ValueError
-            - If `dependence` is set to an unsupported type.
-            - If `dependence` is "dependent" but `weights` are not provided or their length
-              does not match `num_processes`.
+        Simulate intensity realisations for each subprocess (shape PxNxNsims).
         """
         if self.dependence == "independent":
             self.time_series = []
             for cif in self.cifs:
-                # Update simulate parameters
-                cif.simulate = True
-                cif.T = self.T
-                cif.Nsims = self.Nsims
-                cif.N = int(self.T * cif.fs)
-                cif.time_axis = np.linspace(0, self.T, cif.N, endpoint=False)
+                cif.simulate   = True
+                cif.T          = self.T
+                cif.Nsims      = self.Nsims
+                cif.N          = int(self.T * cif.fs)
+                cif.time_axis  = np.linspace(0, self.T, cif.N, endpoint=False)
 
-                # Simulate the time-domain intensity
-                cif_timedomain = cif._simulate_time_domain()
-
-                # Store the intensity and create time domain object
+                cif_td = cif._simulate_time_domain()
                 cif.time_domain = create_time_domain(
-                    cif.time_axis, intensity_realization=cif_timedomain
+                    cif.time_axis, intensity_realization=cif_td
                 )
-                self.time_series.append(cif_timedomain)
+                self.time_series.append(cif_td)
 
-            # Stack time series to form an array of shape (num_processes, N, Nsims)
-            self.time_series = np.array(self.time_series)
-            self.time_axis = self.cifs[0].time_axis
+            self.time_series = np.array(self.time_series)          # (P,N,Nsims)
+            self.time_axis   = self.cifs[0].time_axis
 
         elif self.dependence == "dependent":
-            # -- Shared Gaussian process, then apply weights ---------------------
-            if self.weights is None:
+            # ---- validate weights ------------------------------------------------
+            bump_PSDs = self.cifs[0].compute_bump_spectra()
+            Q         = len(bump_PSDs)
+            w = np.asarray(self.weights, dtype=complex)
+            if w.ndim == 1:
+                w = np.repeat(w[:, None], Q, axis=1)
+            if w.shape != (self.num_processes, Q):
                 raise ValueError(
-                    "Weights must be provided for dependent Gaussian CIFs."
+                    f"weights must have shape (P,Q)=({self.num_processes},{Q}); "
+                    f"got {w.shape}."
                 )
-            weights = np.array(self.weights, dtype=complex)
-            if weights.shape[0] != self.num_processes:
-                raise ValueError(
-                    "Weights array must have length equal to num_processes."
-                )
+            self.weights = w   # store cleaned weights
 
-            # Make sure each CIF has the correct simulation parameters
             for cif in self.cifs:
-                cif.simulate = True
-                cif.T = self.T
-                cif.Nsims = self.Nsims
-                cif.N = int(self.T * cif.fs)
+                cif.simulate  = True
+                cif.T         = self.T
+                cif.Nsims     = self.Nsims
+                cif.N         = int(self.T * cif.fs)
                 cif.time_axis = np.linspace(0, self.T, cif.N, endpoint=False)
 
-            # Generate one underlying Gaussian freq. process (from the 1st CIF)
-            M = len(self.cifs[0].PSD)
-            U_freqdomain = self.cifs[0]._compute_U_freqdomain(self.cifs[0].PSD, M)
+            # ---- check all CIFs identical -----------------------------------
+            ref = self.cifs[0]
+            for idx, cif in enumerate(self.cifs[1:], 1):
+                if cif.__class__ != ref.__class__ or not np.allclose(cif.PSD, ref.PSD):
+                    raise ValueError(
+                        f"All CIFs must be identical for dependent mode (mismatch @ {idx})."
+                    )
 
-            # Initialize time_series array
+            # ---- generate one Gaussian driver per bump ----------------------
+            M = len(ref.PSD)
+            U_bumps = [ref._compute_U_freqdomain(psd, M) for psd in bump_PSDs]  # Q items
+
+            # ---- build per-process frequency-domain signals -----------------
+            V = np.zeros((self.num_processes, M, self.Nsims), dtype=complex)
+            for q in range(Q):
+                V += w[:, q, None, None] * U_bumps[q]   # broadcast over i
+
+            # ---- IFFT to time-domain ----------------------------------------
             N = int(self.T * self.fs)
             self.time_series = np.zeros((self.num_processes, N, self.Nsims))
+            self.time_axis   = np.linspace(0, self.T, N, endpoint=False)
 
-            # For each CIF, multiply the underlying process by its weight
             for i, cif in enumerate(self.cifs):
-                W_i = weights[i]
-                V_i_freqdomain = W_i * U_freqdomain  # shape: (M, Nsims)
-
-                # IFFT along axis=0 to get time domain
                 Y_i = np.real_if_close(
-                    np.sqrt(self.fs * M)
-                    * ifft(np.fft.ifftshift(V_i_freqdomain, axes=0), axis=0)
+                    np.sqrt(self.fs * M) *
+                    ifft(np.fft.ifftshift(V[i], axes=0), axis=0)
                 )
-                # Extract first N samples & add baseline lambda_0
-                cif_i = Y_i[:N, :] + cif.lambda_0
-                cif_i = np.real_if_close(cif_i)
-                # Enforce non-negative rate
-                cif_i[cif_i < 0] = 0
+                λ_i = Y_i[:N, :] + cif.lambda_0
+                λ_i[λ_i < 0] = 0.0
+                self.time_series[i] = λ_i
 
-                # Store intensity into self.time_series
-                self.time_series[i, :, :] = cif_i
-
-                # Update the CIF's own time_domain
                 cif.time_domain = create_time_domain(
-                    cif.time_axis, intensity_realization=cif_i
+                    self.time_axis, intensity_realization=λ_i
                 )
 
-            self.time_axis = self.cifs[0].time_axis
 
         else:
             raise ValueError(f"Unknown dependence type: {self.dependence}")
 
     def get_spectra(self):
-        """Get the spectra for each subprocess at all frequencies."""
         return self.spectra
 
     def get_total_spectrum(self):
-        """Get the total spectrum (sum of all subprocess spectra)."""
-        return np.sum(self.spectra, axis=0)
+        return self.field_spectrum
 
     def get_cross_spectra(self):
-        """Get the cross-spectra for dependent processes at all frequencies."""
         if self.dependence != "dependent":
-            raise ValueError(
-                "Cross-spectra are only available for dependent processes."
-            )
+            raise ValueError("Cross-spectra are only available for dependent processes.")
         return self.cross_spectra
 
     def get_time_series(self):
-        """Get the simulated time series for each subprocess."""
         if not self.simulate:
-            raise ValueError(
-                "Time series not available. Set simulate=True to generate simulations."
-            )
+            raise ValueError("Time series not available (simulate=False).")
         return self.time_series
 
     def get_time_axis(self):
-        """Get the time axis for simulations."""
         if not self.simulate:
-            raise ValueError(
-                "Time axis not available. Set simulate=True to generate simulations."
-            )
+            raise ValueError("Time axis not available (simulate=False).")
         return self.time_axis
 
     def get_frequencies(self):
-        """Get the frequency axis."""
         return self.frequencies
 
     @property
     def PSD(self):
-        """Get the PSD of the CIF."""
         return self.spectra
 
     def _check_cif_parameters_consistency(self):
-        """Check that all CIFs have identical spectral parameters when dependent."""
-        # For Gaussian CIFs, compare peak_height, center_frequency, and peak_width
-        first_cif_params = {
+        """Ensure identical Gaussian spectral parameters when dependence='dependent'."""
+        ref = {
             "peak_height": self.cifs[0].peak_height,
             "center_frequency": self.cifs[0].center_frequency,
             "peak_width": self.cifs[0].peak_width,
         }
-        for i, cif in enumerate(self.cifs[1:], start=1):
-            current_cif_params = {
+        for i, cif in enumerate(self.cifs[1:], 1):
+            cur = {
                 "peak_height": cif.peak_height,
                 "center_frequency": cif.center_frequency,
                 "peak_width": cif.peak_width,
             }
-            if current_cif_params != first_cif_params:
+            if cur != ref:
                 raise ValueError(
-                    f"Inconsistent CIF parameters detected for dependent processes.\n"
-                    f"Process 0 parameters: {first_cif_params}\n"
-                    f"Process {i} parameters: {current_cif_params}\n\n"
-                    f"All processes must have identical spectral parameters (peak_height, center_frequency, peak_width) "
-                    f"when 'dependence' is set to 'dependent'.\n"
-                    f"Please adjust your model parameters to ensure consistency."
+                    f"Inconsistent Gaussian parameters for dependent processes.\n"
+                    f"Process 0: {ref}\nProcess {i}: {cur}"
                 )
+
+class SumLinearLambda0Multivariate:
+    """
+    Compute per-process baselines for a dependent MultivariateCIF by:
+      1) computing the sum-linear baseline λ_shared = 3√(∑_j h_j gamma_0_j)
+         for the underlying multi-bump PSD (using GaussianCIF.sum_linear_lambda0),
+      2) then scaling by |w_i|:
+         λ₀ᵢ = |w_i| * λ_shared.
+    """
+
+    @staticmethod
+    def compute(mv: "MultivariateCIF") -> list[float]:
+        if mv.dependence != "dependent":
+            raise ValueError("Only for dependent MultivariateCIF.")
+
+        base      = mv.cifs[0]
+        h_q       = np.array(base.peak_height, float)                    # shape (Q,)
+        fs        = base.fs
+        cf_q      = base.center_frequency
+        width_q   = base.peak_width
+
+        # gamma_0 for each bump
+        from filtered_point_process.cif.Spectral_Gaussian import SumLinearLambda0
+        gamma_q = np.array(
+            [SumLinearLambda0.gamma0_for_bump(cf, w, fs) for cf, w in zip(cf_q, width_q)]
+        )                                     # shape (Q,)
+
+        # weights matrix (P,Q)
+        w = np.asarray(mv.weights, dtype=float)
+        if w.ndim == 1:                       # legacy (P,)
+            w = w[:, None]
+
+        # λ0_i = 3 * sqrt( Σ_q  h_q * γ_q * |w_{iq}|² )
+        λ0_list = 3.0 * np.sqrt( (h_q * gamma_q) @ (np.abs(w)**2).T )
+        return λ0_list.tolist()
+
+
+def _sum_linear_lambda0(self) -> list[float]:
+    return SumLinearLambda0Multivariate.compute(self)
+
+# TO DO: refactor this 
+MultivariateCIF.sum_linear_lambda0 = _sum_linear_lambda0

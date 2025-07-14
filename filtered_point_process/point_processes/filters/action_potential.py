@@ -1,3 +1,5 @@
+## action_potential.py
+
 import numpy as np
 from .base import FilterBase
 
@@ -26,7 +28,7 @@ class FastAPFilter(FilterBase):
         """
         super().__init__(point_process, filter_params=filter_params)
 
-        self.k = self.filter_params.get("k", 100)
+        self.k = self.filter_params.get("k", 1)
         self.f0 = self.filter_params.get("f0", 4000)
         self.theta = self.filter_params.get("theta", np.pi / 4)
         self.sigma = self.filter_params.get("sigma", 0.00005)
@@ -44,16 +46,18 @@ class FastAPFilter(FilterBase):
         """
         fs = self.pp.cif.fs
         freqs = self.frequencies
-        t = np.linspace(0, 1, int(fs))
 
-        self.filter_params.setdefault("filter_time_vector", t)
+        if self.pp.cif.simulate:
+            t = np.linspace(0, 1, int(fs))
 
-        # Time-domain kernel
-        self._kernel_t = (
-            self.k
-            * np.exp(-((t - self.t0) ** 2) / (2.0 * self.sigma**2))
-            * np.cos(2 * np.pi * self.f0 * (t - self.t0) + self.theta)
-        )
+            self.filter_params.setdefault("filter_time_vector", t)
+
+            # Time-domain kernel
+            self._kernel_t = (
+                self.k
+                * np.exp(-((t - self.t0) ** 2) / (2.0 * self.sigma**2))
+                * np.cos(2 * np.pi * self.f0 * (t - self.t0) + self.theta)
+            )
 
         # Frequency-domain kernel
         omega = 2 * np.pi * freqs
@@ -121,16 +125,17 @@ class SlowAPFilter(FilterBase):
         """
         fs = self.pp.cif.fs
         freqs = self.frequencies
-        t = np.linspace(0, 1, int(fs * 1))
+        if self.pp.cif.simulate:
+            t = np.linspace(0, 1, int(fs * 1))
 
-        self.filter_params.setdefault("filter_time_vector", t)
+            self.filter_params.setdefault("filter_time_vector", t)
 
-        # Time-domain kernel
-        self._kernel_t = (
-            self.k
-            * np.exp(-((t - self.t0) ** 2) / (2.0 * self.sigma**2))
-            * np.cos(2 * np.pi * self.f0 * (t - self.t0) + self.theta)
-        )
+            # Time-domain kernel
+            self._kernel_t = (
+                self.k
+                * np.exp(-((t - self.t0) ** 2) / (2.0 * self.sigma**2))
+                * np.cos(2 * np.pi * self.f0 * (t - self.t0) + self.theta)
+            )
 
         # Frequency-domain kernel
         omega = 2 * np.pi * freqs

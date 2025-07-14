@@ -1,3 +1,4 @@
+# AR.py
 import numpy as np
 import warnings
 from filtered_point_process.cif.BaseCIF import CIFBase

@@ -1,3 +1,5 @@
+#other.py
+
 import numpy as np
 from .base import FilterBase
 
@@ -26,9 +28,10 @@ class LeakyIntegratorFilter(FilterBase):
         super().__init__(point_process, filter_params=filter_params)
 
         fs = self.pp.cif.fs
-        T = self.pp.cif.T
-        self.filter_params.setdefault("A", 1.0 / 0.1)
-        self.filter_params.setdefault("filter_time_vector", np.linspace(0, 1, int(fs * 1)))
+        #T = self.pp.cif.T
+        self.filter_params.setdefault("A", 20) # was 10 
+        if self.pp.cif.simulate:
+            self.filter_params.setdefault("filter_time_vector", np.linspace(0, 1, int(fs * 1)))
 
         self.compute_filter()
 
@@ -41,13 +44,13 @@ class LeakyIntegratorFilter(FilterBase):
         (`self._kernel_spectrum`).
         """
         A = self.filter_params["A"]
-        t_vector = self.filter_params["filter_time_vector"]
+        if self.pp.cif.simulate:
+            t_vector = self.filter_params["filter_time_vector"]
+            # Time-domain
+            self._kernel_t = np.exp(-A * t_vector)
+
+        
         freqs = self.frequencies
-
-        # Time-domain
-        self._kernel_t = np.exp(-A * t_vector)
-
-        self._kernel_t[0] = 0
 
         # Frequency-domain
         self._kernel_f = 1.0 / (A + 1j * 2 * np.pi * freqs)
@@ -84,7 +87,8 @@ class LorenzianFilter(FilterBase):
         fs = self.pp.cif.fs
         self.filter_params.setdefault("A", 1.0 / 0.1)
         self.filter_params.setdefault("alpha", 1.0)
-        self.filter_params.setdefault("filter_time_vector", np.arange(0, T, 1.0 / fs))
+        if self.pp.cif.simulate:
+            self.filter_params.setdefault("filter_time_vector", np.arange(0, T, 1.0 / fs))
 
         self.compute_filter()
 
@@ -96,13 +100,17 @@ class LorenzianFilter(FilterBase):
         raised to the power of alpha and computes the corresponding frequency-domain kernel (`self._kernel_f`)
         along with the power spectrum (`self._kernel_spectrum`).
         """
+
+
+
         A = self.filter_params["A"]
         alpha = self.filter_params["alpha"]
-        t_vector = self.filter_params["filter_time_vector"]
         freqs = self.frequencies
 
-        # Time-domain
-        self._kernel_t = np.exp(-(A**alpha) * t_vector)
+        if self.pp.cif.simulate:
+            t_vector = self.filter_params["filter_time_vector"]
+            # Time-domain
+            self._kernel_t = np.exp(-(A**alpha) * t_vector)
 
         # Frequency-domain
         self._kernel_f = 1.0 / (A + 1j * 2 * np.pi * freqs) ** alpha

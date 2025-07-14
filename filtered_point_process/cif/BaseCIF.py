@@ -1,3 +1,4 @@
+#basecif.py
 import numpy as np
 import warnings
 from abc import ABC, abstractmethod
@@ -40,6 +41,13 @@ class CIFBase(ABC):
         self.seed = seed
         self.random_state = np.random.RandomState(seed)
 
+        if simulate:
+            if T is None:
+                raise ValueError("Total time T must be provided for simulation.")
+            self.n_samples = int(T * self.fs)
+        else:
+            self.n_samples = 100_000  # or set a default value if needed
+
         # Handle NFFT and fs according to the new requirements
         self._handle_nfft_fs()
 
@@ -77,17 +85,22 @@ class CIFBase(ABC):
             raise ValueError("Sampling frequency fs must be provided.")
 
         # Set default NFFT if not provided
-        if self.NFFT is None:
-            self.NFFT = 100_000
+        #if self.NFFT is None:
+            #self.NFFT = nextpow2(self.n_samples) + 100_000
+
+        target_df = 0.01  
+        desired_len = int(np.ceil(self.fs / target_df))
+        self.NFFT = nextpow2(desired_len)
+        #print(f"{self.NFFT} is NFFT")
 
         # Check if fs exceeds the threshold
-        if self.fs > 15_000:
-            self.NFFT = nextpow2(self.fs) + 100_000
-            warnings.warn(
-                "Sampling frequency fs is greater than 15,000 Hz. "
-                "Functions and plots will be very computationally expensive.",
-                UserWarning,
-            )
+        #if self.fs > 15_000:
+        #    self.NFFT =  nextpow2(self.n_samples) + 100_000
+        #    warnings.warn(
+        #        "Sampling frequency fs is greater than 15,000 Hz. "
+        #        "Functions and plots will be very computationally expensive.",
+        #        UserWarning,
+        #    )
 
     @abstractmethod
     def _compute_spectrum(self):
