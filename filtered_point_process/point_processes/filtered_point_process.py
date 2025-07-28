@@ -298,7 +298,7 @@ class FilteredPointProcess:
                 inst.filter_params["filter_time_vector"] = np.arange(0, T_eff + dt, dt)
                 inst.compute_filter()
         t1 = time.perf_counter()
-        print(f"[timing] recompute filters took {t1-t0:.2f}s")
+        # print(f"[timing] recompute filters took {t1-t0:.2f}s")
         # ─────────────────────────────────────────────────────────────────────────────
 
         # 2) loop processes
@@ -350,35 +350,35 @@ class FilteredPointProcess:
                     - (np.exp(-t_axis/tau_r) - np.exp(-A*t_axis)) / (A - 1/tau_r)
                     )
 
-                    # ——— DEBUG PLOT 1: kernel & FFT vs analytic product ———
-                    import matplotlib.pyplot as plt, os
-                    f_axis   = np.fft.rfftfreq(len(h_comb), dt)
-                    H_fft    = np.fft.rfft(h_comb) * dt
-                    H1       = 1/(1/tau_d   + 1j*2*np.pi*f_axis) - 1/(1/tau_r + 1j*2*np.pi*f_axis)
-                    H2       = 1/(A         + 1j*2*np.pi*f_axis)
-                    H_prod   = H1 * H2
+                    # # ——— DEBUG PLOT 1: kernel & FFT vs analytic product ———
+                    # import matplotlib.pyplot as plt, os
+                    # f_axis   = np.fft.rfftfreq(len(h_comb), dt)
+                    # H_fft    = np.fft.rfft(h_comb) * dt
+                    # H1       = 1/(1/tau_d   + 1j*2*np.pi*f_axis) - 1/(1/tau_r + 1j*2*np.pi*f_axis)
+                    # H2       = 1/(A         + 1j*2*np.pi*f_axis)
+                    # H_prod   = H1 * H2
 
-                    fig, ax = plt.subplots(1,2,figsize=(10,4))
-                    # FFT vs product
-                    ax[0].loglog(f_axis, np.abs(H_fft)**2,    label="FFT(h_comb)")
-                    ax[0].loglog(f_axis, np.abs(H_prod)**2, '--', label="Analytic |H1H2|²")
-                    ax[0].set_title("Combined Kernel Spectrum")
-                    ax[0].set_xlabel("Frequency (Hz)")
-                    ax[0].set_ylabel("|H|²")
-                    ax[0].legend(fontsize=8)
+                    # fig, ax = plt.subplots(1,2,figsize=(10,4))
+                    # # FFT vs product
+                    # ax[0].loglog(f_axis, np.abs(H_fft)**2,    label="FFT(h_comb)")
+                    # ax[0].loglog(f_axis, np.abs(H_prod)**2, '--', label="Analytic |H1H2|²")
+                    # ax[0].set_title("Combined Kernel Spectrum")
+                    # ax[0].set_xlabel("Frequency (Hz)")
+                    # ax[0].set_ylabel("|H|²")
+                    # ax[0].legend(fontsize=8)
 
-                    # kernel
-                    ax[1].plot(t_axis, h_comb, lw=1.5)
-                    ax[1].set_title("Analytic h_comb(t)")
-                    ax[1].set_xlabel("Time (s)")
-                    ax[1].set_ylabel("Amplitude")
+                    # # kernel
+                    # ax[1].plot(t_axis, h_comb, lw=1.5)
+                    # ax[1].set_title("Analytic h_comb(t)")
+                    # ax[1].set_xlabel("Time (s)")
+                    # ax[1].set_ylabel("Amplitude")
                     
-                    output_dir = "/Users/patrick_bloniasz/filtered-point-process/examples/demo_cutoff_lambda/"
-                    plt.tight_layout()
-                    if output_dir:
-                        os.makedirs(output_dir, exist_ok=True)
-                        fig.savefig(os.path.join(output_dir, "analytic_kernel_and_fft.png"), dpi=300)
-                    plt.close(fig)
+                    # # output_dir = "/Users/patrick_bloniasz/filtered-point-process/examples/demo_cutoff_lambda/"
+                    # plt.tight_layout()
+                    # if output_dir:
+                    #     os.makedirs(output_dir, exist_ok=True)
+                    #     fig.savefig(os.path.join(output_dir, "analytic_kernel_and_fft.png"), dpi=300)
+                    #     plt.close(fig)
                     # ——————————————————————————————————————————————
 
                     # 4) pad and convolve so no spike‐tail is lost
@@ -395,12 +395,12 @@ class FilteredPointProcess:
                         max_mem_bytes=500_000_000  # for example 200 MB cap
                     )
                     t3 = time.perf_counter()
-                    print(f"[timing] continuous convolution took {t3-t2:.2f}s")
+                    # print(f"[timing] continuous convolution took {t3-t2:.2f}s")
 
                     start          = int(np.round(pad / dt))
                     filtered_train = filtered_full[start : start + self.N]
                     t4 = time.perf_counter()
-                    print(f"[timing] apply_filter_sequences total: {t4-t0:.2f}s")
+                    # print(f"[timing] apply_filter_sequences total: {t4-t0:.2f}s")
 
                 else:
                     # numeric cascade + continuous convolution

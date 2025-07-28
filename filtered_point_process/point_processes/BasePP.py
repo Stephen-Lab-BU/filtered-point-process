@@ -74,8 +74,8 @@ class BasePointProcess(ABC):
         time_axis = self.cif.time_domain.get_time_axis()
         T = self.cif.T  # Total time from the CIF
 
-        assert isinstance(self.cif.seed, int), "Seed must be an integer."
-        np_random = np.random.default_rng(self.cif.seed)
+        # assert isinstance(self.cif.seed, int), "Seed must be an integer."
+        np_random = self.cif.random_state
 
         time_axis = time_axis.flatten()
         if intensity.ndim > 1:
@@ -152,7 +152,7 @@ class BasePointProcess(ABC):
             each array corresponds to a different subprocess.
         """
         T = self.cif.T  # Total time from the CIF
-        np_random = np.random.RandomState(self.cif.seed)
+        np_random = self.cif.random_state
 
         if isinstance(lambda_rate, (list, np.ndarray)):
             # Multivariate case

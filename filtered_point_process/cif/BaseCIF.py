@@ -38,7 +38,6 @@ class CIFBase(ABC):
             )
         self.fs = fs
         self.NFFT = NFFT
-        self.seed = seed
         self.random_state = np.random.RandomState(seed)
 
         if simulate:
