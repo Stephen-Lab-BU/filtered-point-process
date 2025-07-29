@@ -110,7 +110,7 @@ class GABAFilter(FilterBase):
 
         if self.pp.cif.simulate:
 
-            self.filter_params["filter_time_vector"] = np.linspace(0, 1, int(fs * 1))
+            self.filter_params["filter_time_vector"] = np.linspace(0, 10, int(fs * 1))
             T = self.pp.cif.T
             # Time-domain
             self._kernel_t = np.exp(
