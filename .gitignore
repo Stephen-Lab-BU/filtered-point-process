@@ -1,6 +1,7 @@
 filtered_point_process/__pycache__/*
 filtered_point_process/point_processes/__pycache__/*
 filtered_point_process/cif/__pycache__/*
+filtered_point_process/point_processes/filters/__pycache__/*
 filtered_point_process/domains/__pycache__/*
 filtered_point_process/utils/__pycache__/*
 visualization.cpython-310.pyc
