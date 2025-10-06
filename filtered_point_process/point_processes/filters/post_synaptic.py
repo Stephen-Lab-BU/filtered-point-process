@@ -1,126 +1,94 @@
-#post_synaptic.py
-
+# post_synaptic.py
 import numpy as np
 from .base import FilterBase
 
-
-class AMPAFilter(FilterBase):
+class PSPFilter(FilterBase):
     """
-    Filter class for AMPA point processes (Post-Synaptic Potential).
+    Generic post-synaptic potential (PSP) filter with double-exponential kernel.
 
-    This filter models the excitatory post-synaptic potentials (EPSPs) mediated by AMPA receptors.
-    It defines both the time-domain and frequency-domain kernels based on rise and decay time constants.
+    Shared behavior:
+      - Scalar gain `h` multiplies the time-domain kernel; spectrum scales by h^2.
+      - Kernel time axis matches CIF time axis via pp.cif.cif_time_axis (helper on CIFBase).
+      - Frequency axis prefers pp.cif.cif_frequencies if present (falls back to FilterBase.frequencies).
     """
+    DEFAULTS = {
+        "tau_rise": 0.4e-3,
+        "tau_decay": 4e-3,
+        "h": 1.0,
+    }
 
     def __init__(self, point_process, filter_params=None):
-        """
-        Initialize the AMPAFilter with specified parameters.
-
-        Args:
-            point_process (object): The point process or model instance to which the filter is applied.
-            filter_params (dict, optional): Dictionary of parameters for configuring the filter.
-                                            Supported keys include:
-                                                - "tau_rise" (float): Rise time constant in seconds. Defaults to 0.4e-3.
-                                                - "tau_decay" (float): Decay time constant in seconds. Defaults to 4e-3.
-        """
         super().__init__(point_process, filter_params=filter_params)
-
-        if "tau_rise" not in self.filter_params:
-            self.filter_params["tau_rise"] = 0.4e-3
-        if "tau_decay" not in self.filter_params:
-            self.filter_params["tau_decay"] = 4e-3
-
+        for k, v in PSPFilter.DEFAULTS.items():
+            self.filter_params.setdefault(k, v)
         self.compute_filter()
 
+    # ---- Helpers ------------------------------------------------------------
+    def _time_axis(self) -> np.ndarray:
+        """
+        Use CIF helper to get the data time axis (exact length match).
+        Falls back to fs/T if needed.
+        """
+        fs = float(self.pp.cif.fs)
+        # Preferred: CIFBase property (uses TimeDomain inside CIF)
+        try:
+            t = np.asarray(self.pp.cif.cif_time_axis).squeeze()
+            if t.ndim != 1:
+                raise ValueError("pp.cif.cif_time_axis must be 1D.")
+            return t
+        except Exception:
+            # Fallback: build from fs and T
+            if not hasattr(self.pp.cif, "T") or self.pp.cif.T is None:
+                raise ValueError("No CIF time axis available and T is missing; cannot size kernel.")
+            N = int(round(self.pp.cif.T * fs))
+            return np.arange(N, dtype=float) / fs
+
+    def _freq_axis(self) -> np.ndarray:
+        """Prefer CIF frequency axis; else use FilterBase-provided frequencies."""
+        try:
+            f = np.asarray(self.pp.cif.cif_frequencies).squeeze()
+            if f.ndim == 1 and f.size > 0:
+                return f
+        except Exception:
+            pass
+        return self.frequencies
+
+    # ---- Core ---------------------------------------------------------------
     def compute_filter(self):
-        """
-        Compute the time-domain and frequency-domain kernels for the AMPA filter.
+        fs = float(self.pp.cif.fs)
+        t = self._time_axis()
+        freqs = self._freq_axis()
 
-        This method calculates the time-domain kernel (`self._kernel_t`) using a double exponential function
-        representing the rise and decay of the post-synaptic potential. It then computes the corresponding
-        frequency-domain kernel (`self._kernel_f`) and the power spectrum (`self._kernel_spectrum`).
-        """
-        fs = self.pp.cif.fs
+        tau_rise = float(self.filter_params["tau_rise"])
+        tau_decay = float(self.filter_params["tau_decay"])
+        h = float(self.filter_params.get("h", 1.0))
 
-        freqs = self.frequencies
-            
-        tau_rise = self.filter_params["tau_rise"]
-        tau_decay = self.filter_params["tau_decay"]
+        # Time-domain double-exponential (EPSP/IPSP) scaled by h
+        self.filter_params["filter_time_vector"] = t  # keep for introspection
+        self._kernel_t = h * (np.exp(-t / tau_decay) - np.exp(-t / tau_rise))
 
-        if self.pp.cif.simulate:
-            T = self.pp.cif.T
-            self.filter_params["filter_time_vector"] = np.linspace(0, 1, int(fs *1))
-
-    
-            self._kernel_t = np.exp(
-                -self.filter_params["filter_time_vector"] / tau_decay
-            ) - np.exp(-self.filter_params["filter_time_vector"] / tau_rise)
-
-        self._kernel_f = 1.0 / (1.0 / tau_decay + 1j * 2 * np.pi * freqs) - 1.0 / (
-            1.0 / tau_rise + 1j * 2 * np.pi * freqs
-        )
+        # Frequency-domain transfer function (analytic), amplitude scales with h
+        jw = 1j * 2 * np.pi * freqs
+        kernel_f = (1.0 / (1.0 / tau_decay + jw)) - (1.0 / (1.0 / tau_rise + jw))
+        self._kernel_f = h * kernel_f  # => power scales by h^2 automatically
 
         _kernel_fsym = self._create_symmetric_frequency_response(self._kernel_f)
-        self._kernel_spectrum = np.abs(_kernel_fsym) ** 2
+        self._kernel_spectrum = np.abs(_kernel_fsym) ** 2  # includes h^2
 
-
-class GABAFilter(FilterBase):
-    """
-    Filter class for GABA point processes (Post-Synaptic Potential).
-
-    This filter models the inhibitory post-synaptic potentials (IPSPs) mediated by GABA receptors.
-    It defines both the time-domain and frequency-domain kernels based on rise and decay time constants.
-    """
-
+class AMPAFilter(PSPFilter):
+    """AMPA EPSP filter (excitatory)."""
     def __init__(self, point_process, filter_params=None):
-        """
-        Initialize the GABAFilter with specified parameters.
-
-        Args:
-            point_process (object): The point process or model instance to which the filter is applied.
-            filter_params (dict, optional): Dictionary of parameters for configuring the filter.
-                                            Supported keys include:
-                                                - "tau_rise" (float): Rise time constant in seconds. Defaults to 0.4e-3.
-                                                - "tau_decay" (float): Decay time constant in seconds. Defaults to 10e-3.
-        """
+        filter_params = dict(
+            {**PSPFilter.DEFAULTS, "tau_decay": 4e-3, "tau_rise": 0.4e-3},
+            **(filter_params or {}),
+        )
         super().__init__(point_process, filter_params=filter_params)
 
-        if "tau_rise" not in self.filter_params:
-            self.filter_params["tau_rise"] = 0.4e-3
-        if "tau_decay" not in self.filter_params:
-            self.filter_params["tau_decay"] = 10e-3
-
-        self.compute_filter()
-
-    def compute_filter(self):
-        """
-        Compute the time-domain and frequency-domain kernels for the GABA filter.
-
-        This method calculates the time-domain kernel (`self._kernel_t`) using a double exponential function
-        representing the rise and decay of the post-synaptic potential. It then computes the corresponding
-        frequency-domain kernel (`self._kernel_f`) and the power spectrum (`self._kernel_spectrum`).
-        """
-        fs = self.pp.cif.fs
-        freqs = self.frequencies
-
-        
-
-        tau_rise = self.filter_params["tau_rise"]
-        tau_decay = self.filter_params["tau_decay"]
-
-        if self.pp.cif.simulate:
-
-            self.filter_params["filter_time_vector"] = np.linspace(0, 1, int(fs * 1))
-            T = self.pp.cif.T
-            # Time-domain
-            self._kernel_t = np.exp(
-                -self.filter_params["filter_time_vector"] / tau_decay
-            ) - np.exp(-self.filter_params["filter_time_vector"] / tau_rise)
-
-        # Frequency-domain
-        self._kernel_f = 1.0 / (1.0 / tau_decay + 1j * 2 * np.pi * freqs) - 1.0 / (
-            1.0 / tau_rise + 1j * 2 * np.pi * freqs
+class GABAFilter(PSPFilter):
+    """GABA IPSP filter (inhibitory)."""
+    def __init__(self, point_process, filter_params=None):
+        filter_params = dict(
+            {**PSPFilter.DEFAULTS, "tau_decay": 10e-3, "tau_rise": 0.4e-3},
+            **(filter_params or {}),
         )
-
-        _kernel_fsym = self._create_symmetric_frequency_response(self._kernel_f)
-        self._kernel_spectrum = np.abs(_kernel_fsym) ** 2
+        super().__init__(point_process, filter_params=filter_params)

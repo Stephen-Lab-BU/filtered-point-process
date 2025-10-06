@@ -1,160 +1,146 @@
-## action_potential.py
-
+# action_potential.py
 import numpy as np
 from .base import FilterBase
 
-
-class FastAPFilter(FilterBase):
+class APFilter(FilterBase):
     """
-    Filter class for modeling Fast Action Potential (AP) processes.
+    Generic Action Potential (AP) filter with Gabor-like kernel.
 
-    This filter represents the synaptic response associated with fast action potentials.
-    It defines both the time-domain and frequency-domain kernels based on specified parameters.
+    - Scalar gain `h` multiplies the time-domain kernel; power spectrum scales ~ h^2.
+    - Kernel time axis equals CIF time axis (pp.cif.cif_time_axis), else fs/T fallback.
+    - Frequency axis prefers CIF frequencies; else FilterBase.frequencies.
     """
+
+    DEFAULTS = {
+        "h": 1.0,         # scalar gain
+        "f0": 1_000.0,    # center frequency [Hz]
+        "theta": np.pi/4, # phase [rad]
+        "sigma": 5e-4,    # Gaussian std [s]
+        "t0": 1.0e-3,     # time offset [s]
+    }
 
     def __init__(self, point_process, filter_params=None):
-        """
-        Initialize the FastAPFilter with specified parameters.
-
-        Args:
-            point_process (object): The point process or model instance to which the filter is applied.
-            filter_params (dict, optional): Dictionary of parameters for configuring the filter.
-                                            Supported keys include:
-                                                - "k" (float): Scaling factor for the kernel. Defaults to 100.
-                                                - "f0" (float): Center frequency in Hz. Defaults to 4000.
-                                                - "theta" (float): Phase offset in radians. Defaults to π/4.
-                                                - "sigma" (float): Standard deviation for the Gaussian envelope. Defaults to 0.00005.
-                                                - "t0" (float): Time offset in seconds. Defaults to 0.0005.
-        """
         super().__init__(point_process, filter_params=filter_params)
-
-        self.k = self.filter_params.get("k", 1)
-        self.f0 = self.filter_params.get("f0", 4000)
-        self.theta = self.filter_params.get("theta", np.pi / 4)
-        self.sigma = self.filter_params.get("sigma", 0.00005)
-        self.t0 = self.filter_params.get("t0", 0.0005)
-
+        # Fill defaults FIRST, then apply provided params, then compute
+        for k, v in APFilter.DEFAULTS.items():
+            self.filter_params.setdefault(k, v)
+        if filter_params:
+            self.filter_params.update(filter_params)
         self.compute_filter()
 
+    # ----- public API to update params and force recompute -----
+    def update_filter_params(self, params: dict | None = None):
+        if params:
+            self.filter_params.update(params)
+        self.compute_filter()
+
+    @property
+    def h(self) -> float:
+        return float(self.filter_params["h"])
+
+    @h.setter
+    def h(self, value: float):
+        self.filter_params["h"] = float(value)
+        self.compute_filter()
+
+    # ----- axes helpers -----
+    def _time_axis(self) -> np.ndarray:
+        fs = float(self.pp.cif.fs)
+        try:
+            t = np.asarray(self.pp.cif.cif_time_axis).squeeze()
+            if t.ndim != 1:
+                raise ValueError("pp.cif.cif_time_axis must be 1D.")
+            return t
+        except Exception:
+            if not hasattr(self.pp.cif, "T") or self.pp.cif.T is None:
+                raise ValueError("No CIF time axis and T missing; cannot size AP kernel.")
+            N = int(round(self.pp.cif.T * fs))
+            if N <= 0:
+                raise ValueError("Computed kernel length N <= 0. Check fs and T.")
+            return np.arange(N, dtype=float) / fs
+
+    def _freq_axis(self) -> np.ndarray:
+        try:
+            f = np.asarray(self.pp.cif.cif_frequencies).squeeze()
+            if f.ndim == 1 and f.size > 0:
+                return f
+        except Exception:
+            pass
+        return self.frequencies
+
+    # ----- core computation -----
     def compute_filter(self):
-        """
-        Compute the time-domain and frequency-domain kernels for the Fast AP filter.
+        t = self._time_axis()
+        freqs = self._freq_axis().astype(float)
 
-        This method calculates the time-domain kernel (`self._kernel_t`) using a Gabor function and
-        computes the corresponding frequency-domain kernel (`self._kernel_f`)
-        along with the power spectrum (`self._kernel_spectrum`).
-        """
-        fs = self.pp.cif.fs
-        freqs = self.frequencies
+        h_gain = float(self.filter_params.get("h", 1.0))
+        f0     = float(self.filter_params["f0"])
+        theta  = float(self.filter_params["theta"])
+        sigma  = float(self.filter_params["sigma"])
+        t0     = float(self.filter_params["t0"])
 
-        if self.pp.cif.simulate:
-            t = np.linspace(0, 1, int(fs))
+        # --- Time domain: multiply by h ---
+        self.filter_params["filter_time_vector"] = t
+        g = np.exp(-((t - t0) ** 2) / (2.0 * sigma**2))
+        c = np.cos(2 * np.pi * f0 * (t - t0) + theta)
+        self._kernel_t = h_gain * g * c
 
-            self.filter_params.setdefault("filter_time_vector", t)
-
-            # Time-domain kernel
-            self._kernel_t = (
-                self.k
-                * np.exp(-((t - self.t0) ** 2) / (2.0 * self.sigma**2))
-                * np.cos(2 * np.pi * self.f0 * (t - self.t0) + self.theta)
-            )
-
-        # Frequency-domain kernel
+        # --- Frequency domain: DO NOT multiply transfer function by h ---
         omega = 2 * np.pi * freqs
         exp_term = np.exp(
-            -1j * self.theta
-            - 2.0 * (self.f0**2) * (np.pi**2) * (self.sigma**2)
-            - 1j * self.t0 * omega
-            - 2.0 * self.f0 * np.pi * (self.sigma**2) * omega
-            - (self.sigma**2) * (omega**2) / 2.0
+            -1j * theta
+            - 2.0 * (f0**2) * (np.pi**2) * (sigma**2)
+            - 1j * t0 * omega
+            - 2.0 * f0 * np.pi * (sigma**2) * omega
+            - (sigma**2) * (omega**2) / 2.0
         )
-        cos_term = 1.0 + np.exp(
-            2j * self.theta + 4.0 * self.f0 * np.pi * self.sigma**2 * omega
-        )
-        self._kernel_f = (
-            self.k
-            * exp_term
-            * cos_term
-            * np.sqrt(np.pi / 2.0)
-            / np.sqrt(1.0 / self.sigma**2)
-        )
+        cos_term = 1.0 + np.exp(2j * theta + 4.0 * f0 * np.pi * sigma**2 * omega)
 
-        self._kernel_spectrum = np.abs(self._kernel_f) ** 2
+        # Base complex frequency response (no h here)
+        kernel_f_base = exp_term * cos_term * np.sqrt(np.pi / 2.0) * sigma
+        self._kernel_f = kernel_f_base
+
+        # --- Spectrum: multiply by h^2 ---
+        _kernel_fsym = self._create_symmetric_frequency_response(self._kernel_f)
+        self._kernel_spectrum = (np.abs(_kernel_fsym) ** 2) * (h_gain ** 2)
+
+    # ----- raw (non-normalized) accessors -----
+    @property
+    def kernel(self):
+        return self._kernel_t
+
+    @property
+    def kernel_time_axis(self):
+        return self.filter_params["filter_time_vector"]
+
+    @property
+    def kernel_spectrum(self):
+        return self._kernel_spectrum
 
 
-class SlowAPFilter(FilterBase):
-    """
-    Filter class for modeling Slow Action Potential (AP) processes.
-
-    This filter represents the synaptic response associated with slow action potentials.
-    It defines both the time-domain and frequency-domain kernels based on specified parameters.
-    """
-
+class FastAPFilter(APFilter):
     def __init__(self, point_process, filter_params=None):
-        """
-        Initialize the SlowAPFilter with specified parameters.
+        defaults = {
+            **APFilter.DEFAULTS,
+            "h": 1.0,
+            "f0": 4000.0,
+            "theta": np.pi / 4,
+            "sigma": 50e-6,  # 0.00005 s
+            "t0": 0.0005,    # 0.5 ms
+        }
+        params = {**defaults, **(filter_params or {})}
+        super().__init__(point_process, filter_params=params)
 
-        Args:
-            point_process (object): The point process or model instance to which the filter is applied.
-            filter_params (dict, optional): Dictionary of parameters for configuring the filter.
-                                            Supported keys include:
-                                                - "k" (float): Scaling factor for the kernel. Defaults to 1.
-                                                - "f0" (float): Center frequency in Hz. Defaults to 300.
-                                                - "theta" (float): Phase offset in radians. Defaults to π/4.
-                                                - "sigma" (float): Standard deviation for the Gaussian envelope. Defaults to 0.0005.
-                                                - "t0" (float): Time offset in seconds. Defaults to 0.0015.
-        """
 
-        super().__init__(point_process, filter_params=filter_params)
-
-        self.k = self.filter_params.get("k", 1)
-        self.f0 = self.filter_params.get("f0", 300)
-        self.theta = self.filter_params.get("theta", np.pi / 4)
-        self.sigma = self.filter_params.get("sigma", 0.0005)
-        self.t0 = self.filter_params.get("t0", 0.0015)
-
-        self.compute_filter()
-
-    def compute_filter(self):
-        """
-        Compute the time-domain and frequency-domain kernels for the Slow AP filter.
-
-        This method calculates the time-domain kernel (`self._kernel_t`) using a Gaussian-modulated
-        cosine function and computes the corresponding frequency-domain kernel (`self._kernel_f`)
-        along with the power spectrum (`self._kernel_spectrum`).
-        """
-        fs = self.pp.cif.fs
-        freqs = self.frequencies
-        if self.pp.cif.simulate:
-            t = np.linspace(0, 1, int(fs * 1))
-
-            self.filter_params.setdefault("filter_time_vector", t)
-
-            # Time-domain kernel
-            self._kernel_t = (
-                self.k
-                * np.exp(-((t - self.t0) ** 2) / (2.0 * self.sigma**2))
-                * np.cos(2 * np.pi * self.f0 * (t - self.t0) + self.theta)
-            )
-
-        # Frequency-domain kernel
-        omega = 2 * np.pi * freqs
-        exp_term = np.exp(
-            -1j * self.theta
-            - 2.0 * (self.f0**2) * (np.pi**2) * (self.sigma**2)
-            - 1j * self.t0 * omega
-            - 2.0 * self.f0 * np.pi * (self.sigma**2) * omega
-            - (self.sigma**2) * (omega**2) / 2.0
-        )
-        cos_term = 1.0 + np.exp(
-            2j * self.theta + 4.0 * self.f0 * np.pi * self.sigma**2 * omega
-        )
-        self._kernel_f = (
-            self.k
-            * exp_term
-            * cos_term
-            * np.sqrt(np.pi / 2.0)
-            / np.sqrt(1.0 / self.sigma**2)
-        )
-
-        self._kernel_spectrum = np.abs(self._kernel_f) ** 2
+class SlowAPFilter(APFilter):
+    def __init__(self, point_process, filter_params=None):
+        defaults = {
+            **APFilter.DEFAULTS,
+            "h": 1.0,
+            "f0": 300.0,
+            "theta": np.pi / 4,
+            "sigma": 0.0005,  # 0.5 ms
+            "t0": 0.0015,     # 1.5 ms
+        }
+        params = {**defaults, **(filter_params or {})}
+        super().__init__(point_process, filter_params=params)
