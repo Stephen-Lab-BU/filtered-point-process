@@ -93,7 +93,11 @@ class MultivariateCIF:
         if dependence == "dependent":
             self._check_cif_parameters_consistency()
 
-        self.num_bumps = len(self.cifs[0].compute_bump_spectra())
+        if self._cif_type_label == "Gaussian":
+            self.num_bumps = len(self.cifs[0].compute_bump_spectra())
+        else:
+            self.num_bumps = 0
+            
         if weights is None:
             weights = np.ones(self.num_processes)
         self._stash_weights(weights)
