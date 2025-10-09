@@ -19,8 +19,8 @@ filtered-point-process
    :target: https://opensource.org/licenses/BSD-3-Clause
    :alt: license
 
-.. |Publication| image:: https://img.shields.io/badge/paper-bioRxiv-green.svg
-   :target: https://doi.org/10.1101/2024.10.01.616132
+.. |Publication| image:: https://img.shields.io/badge/paper-Published-blue.svg
+   :target: https://doi.org/10.1088/1741-2552/ade28b
    :alt: publication
 
 Beta package associated with the paper 
