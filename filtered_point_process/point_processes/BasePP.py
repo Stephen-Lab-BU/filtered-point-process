@@ -75,7 +75,7 @@ class BasePointProcess(ABC):
         T = self.cif.T  # Total time from the CIF
 
         assert isinstance(self.cif.seed, int), "Seed must be an integer."
-        np_random = np.random.default_rng(self.cif.seed)
+        np_random = self.cif.random_state
 
         time_axis = time_axis.flatten()
         if intensity.ndim > 1:
