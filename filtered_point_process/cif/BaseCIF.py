@@ -49,7 +49,7 @@ class CIFBase(ABC):
             self.n_samples = 100_000  # or set a default value if needed
 
         # Handle NFFT and fs according to the new requirements
-        self._handle_nfft_fs()
+        self._handle_nfft_fs(T=T)
 
         if frequencies is not None:
             self.frequencies = frequencies
@@ -78,7 +78,22 @@ class CIFBase(ABC):
                 self.time_axis, intensity_realization=intensity
             )
 
-    def _handle_nfft_fs(self):
+    def _handle_nfft_fs(self, T=None):
+        """Set NFFT from the actual simulated record length when T is provided."""
+        if self.fs is None:
+            raise ValueError("Sampling frequency fs must be provided.")
+
+        if self.NFFT is not None:
+            return
+
+        if T is not None:
+            self.NFFT = int(round(T * self.fs))
+        else:
+            target_df = 0.01
+            desired_len = int(np.ceil(self.fs / target_df))
+            self.NFFT = nextpow2(desired_len)
+
+    def _handle_nfft_fs_legacy(self):
         """Set based on a reasonable contiuous heuristic or the user's specification of NFFT and fs."""
         # Ensure fs is provided
         if self.fs is None:
@@ -88,9 +103,18 @@ class CIFBase(ABC):
         #if self.NFFT is None:
             #self.NFFT = nextpow2(self.n_samples) + 100_000
 
-        target_df = 0.01  
-        desired_len = int(np.ceil(self.fs / target_df))
-        self.NFFT = nextpow2(desired_len)
+        #target_df = 0.01  
+        #desired_len = int(np.ceil(self.fs / target_df))
+        #self.NFFT = nextpow2(desired_len)
+        
+        if self.T is not None:
+            self.NFFT = int(round(self.T * self.fs))
+        else:
+            target_df = 0.01
+            desired_len = int(np.ceil(self.fs / target_df))
+            self.NFFT = nextpow2(desired_len)
+
+
         #print(f"{self.NFFT} is NFFT")
 
         # Check if fs exceeds the threshold

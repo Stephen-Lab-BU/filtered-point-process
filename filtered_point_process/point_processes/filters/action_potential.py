@@ -96,7 +96,7 @@ class APFilter(FilterBase):
         )
         cos_term = 1.0 + np.exp(2j * theta + 4.0 * f0 * np.pi * sigma**2 * omega)
 
-        # Base complex frequency response (no h here)
+        # Base complex frequency response
         kernel_f_base = exp_term * cos_term * np.sqrt(np.pi / 2.0) * sigma
         self._kernel_f = kernel_f_base
 
@@ -104,7 +104,7 @@ class APFilter(FilterBase):
         _kernel_fsym = self._create_symmetric_frequency_response(self._kernel_f)
         self._kernel_spectrum = (np.abs(_kernel_fsym) ** 2) * (h_gain ** 2)
 
-    # ----- raw (non-normalized) accessors -----
+    # ----- raw accessors -----
     @property
     def kernel(self):
         return self._kernel_t

@@ -56,24 +56,39 @@ class PSPFilter(FilterBase):
     # ---- Core ---------------------------------------------------------------
     def compute_filter(self):
         fs = float(self.pp.cif.fs)
-        t = self._time_axis()
+        #t = self._time_axis()
+        if self.filter_params.get("filter_time_vector", None) is not None:
+            t = np.asarray(self.filter_params["filter_time_vector"], dtype=float).squeeze()
+        else:
+            t = self._time_axis()
         freqs = self._freq_axis()
 
         tau_rise = float(self.filter_params["tau_rise"])
         tau_decay = float(self.filter_params["tau_decay"])
         h = float(self.filter_params.get("h", 1.0))
 
+        
         # Time-domain double-exponential (EPSP/IPSP) scaled by h
-        self.filter_params["filter_time_vector"] = t  # keep for introspection
+        self.filter_params["filter_time_vector"] = t
         self._kernel_t = h * (np.exp(-t / tau_decay) - np.exp(-t / tau_rise))
 
-        # Frequency-domain transfer function (analytic), amplitude scales with h
-        jw = 1j * 2 * np.pi * freqs
-        kernel_f = (1.0 / (1.0 / tau_decay + jw)) - (1.0 / (1.0 / tau_rise + jw))
-        self._kernel_f = h * kernel_f  # => power scales by h^2 automatically
+        # Build the frequency-domain kernel from the SAME sampled kernel used in simulation
+        dt = 1.0 / fs
+        #n_freq = len(freqs)
+        if self.pp.cif.simulate and hasattr(self.pp.cif, "N"):
+            n_freq = int(self.pp.cif.N)
+            freqs = np.fft.fftshift(np.fft.fftfreq(n_freq, d=1.0 / fs))
+        else:
+            n_freq = len(freqs)
 
-        _kernel_fsym = self._create_symmetric_frequency_response(self._kernel_f)
-        self._kernel_spectrum = np.abs(_kernel_fsym) ** 2  # includes h^2
+        # zero-pad / truncate onto the same FFT grid used by the CIF / point-process spectrum
+        kernel_padded = np.zeros(n_freq, dtype=float)
+        n_copy = min(len(self._kernel_t), n_freq)
+        kernel_padded[:n_copy] = self._kernel_t[:n_copy]
+
+        # FFT on the package's shifted frequency convention
+        self._kernel_f = np.fft.fftshift(np.fft.fft(kernel_padded)) * dt 
+        self._kernel_spectrum = np.abs(self._kernel_f) ** 2
 
 class AMPAFilter(PSPFilter):
     """AMPA EPSP filter (excitatory)."""
